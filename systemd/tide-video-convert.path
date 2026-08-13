@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for videos to convert for tide-island
+
+[Path]
+PathChanged=/home/userone/Videos/ConversionFolder1080p-30fps/
+DirectoryNotEmpty=/home/userone/Videos/ConversionFolder1080p-30fps/
+
+[Install]
+WantedBy=default.target

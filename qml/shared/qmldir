@@ -1,0 +1,4 @@
+module TideIslandShared
+IslandClock 1.0 IslandClock.qml
+singleton IslandMotion 1.0 IslandMotion.qml
+singleton IslandConfiguration 1.0 IslandConfiguration.qml

@@ -1,0 +1,9 @@
+[Unit]
+Description=Downscale videos in ConversionFolder1080p-30fps to 1080p30
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/tide-video-convert.sh
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+# Give notify-send access to the running D-Bus session
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus"
