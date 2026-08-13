@@ -122,8 +122,7 @@ PanelWindow {
         if (notifWidget.item) notifWidget.item.shake()
 
         // Play sound if not DND
-        if (!root.dndActive && IslandConfiguration.notificationSoundEnabled)
-            notifSound.play()
+        // Sound is handled centrally in shell.qml
 
         // Kick off async icon lookup — toast will get icon once resolved
         queueNotificationIconLookup(entry.id, entry.appName)

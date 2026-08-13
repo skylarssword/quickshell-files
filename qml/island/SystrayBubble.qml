@@ -26,8 +26,7 @@ Rectangle {
     onNotificationPulseToggleChanged: {
         if (!root.dndActive) {
             bellWobble.restart()
-            if (IslandConfiguration.notificationSoundEnabled)
-                notificationSound.play()
+            // Sound is handled centrally in shell.qml
         }
     }
 
