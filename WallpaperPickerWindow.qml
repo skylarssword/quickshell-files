@@ -261,7 +261,6 @@ PanelWindow {
         let item = root.missingThumbQueue[0]
         root.missingThumbQueue = root.missingThumbQueue.slice(1)
         thumbGenProc.command = ["bash", "-c",
-            "[ -f " + JSON.stringify(item.target) + " ] || " +
             "ffmpeg -y -i " + JSON.stringify(item.path) +
             " -vframes 1 -vf scale=1280:-1 -f image2 " +
             JSON.stringify(item.target) + " >/dev/null 2>&1"]

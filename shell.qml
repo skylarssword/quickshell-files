@@ -170,6 +170,14 @@ Scope {
 
     property bool sidebarActive: false
 
+    // ── Dock shared state — synced from DynamicIslandWindow ─────────────
+    property bool   dockEnabled:        true
+    property string dockMode:           "pin"
+    property bool   gamemodeActive:     false
+    property real   capsuleOpacity:     0.20
+    property bool   capsuleUseWalColor: false
+    property color  capsuleWalColor:    "#000000"
+
     property real _lastVolume: -1
     property real _lastBrightness: -1
 
@@ -216,6 +224,14 @@ Scope {
             required property var modelData
             screen: modelData
             shellRootController: shellRoot
+
+            // Sync appearance state up to shellRoot so BubbleDockWindow can bind to it
+            onGamemodeActiveChanged:      if (shellRoot.gamemodeActive     !== gamemodeActive)      shellRoot.gamemodeActive     = gamemodeActive
+            onCapsuleOpacityChanged:      if (shellRoot.capsuleOpacity     !== capsuleOpacity)      shellRoot.capsuleOpacity     = capsuleOpacity
+            onCapsuleUseWalColorChanged:  if (shellRoot.capsuleUseWalColor !== capsuleUseWalColor)  shellRoot.capsuleUseWalColor = capsuleUseWalColor
+            onCapsuleWalColorChanged:     if (shellRoot.capsuleWalColor    !== capsuleWalColor)     shellRoot.capsuleWalColor    = capsuleWalColor
+            onDockEnabledChanged:         shellRoot.dockEnabled = dockEnabled
+            onDockModeChanged:            shellRoot.dockMode    = dockMode
         }
     }
 
@@ -240,6 +256,25 @@ Scope {
             screen: modelData
             textFontFamily: shellRoot.userConfig.textFontFamily
             iconFontFamily: shellRoot.userConfig.iconFontFamily
+        }
+    }
+
+    // ── Bubble Dock — one per screen ────────────────────────────────────
+    Variants {
+        id: dockVariants
+        model: Quickshell.screens
+        BubbleDockWindow {
+            required property var modelData
+            screen:              modelData
+            dockEnabled:         shellRoot.dockEnabled
+            dockMode:            shellRoot.dockMode
+            sidebarActive:       shellRoot.sidebarActive
+            gamemodeActive:      shellRoot.gamemodeActive
+            capsuleOpacity:      shellRoot.capsuleOpacity
+            capsuleUseWalColor:  shellRoot.capsuleUseWalColor
+            capsuleWalColor:     shellRoot.capsuleWalColor
+            iconFontFamily:      shellRoot.userConfig.iconFontFamily
+            textFontFamily:      shellRoot.userConfig.textFontFamily
         }
     }
 

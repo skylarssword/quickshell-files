@@ -80,12 +80,16 @@ readonly property color capsuleWalColor: (capsuleWalColorIndex >= 0 && capsuleWa
         ? capsuleWalColors[capsuleWalColorIndex]
         : "#000000"
     property bool appearanceSettingsLoaded: false
+    property bool   dockEnabled: true
+    property string dockMode:    "pin"   // "pin" | "smart"
 
 onCapsuleOpacityChanged:       if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
     onCapsuleUseWalColorChanged:   if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
     onCapsuleWalColorIndexChanged: if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
     onLyricsExpandedViewChanged:   if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
     onBubblesEnabledChanged:       if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
+    onDockEnabledChanged:          if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
+    onDockModeChanged:             if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
     onIdleModeChanged:             if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
     HyprlandDispatch {
         id: hyprDispatch
@@ -636,6 +640,10 @@ Timer {
                                 root.lyricsExpandedView = parsed.lyricsExpandedView
                             if (typeof parsed.bubblesEnabled === "boolean")
                                 root.bubblesEnabled = parsed.bubblesEnabled
+                            if (typeof parsed.dockEnabled === "boolean")
+                                root.dockEnabled = parsed.dockEnabled
+                            if (typeof parsed.dockMode === "string")
+                                root.dockMode = parsed.dockMode
                             if (typeof parsed.idleMode === "boolean")
                                 root.idleMode = parsed.idleMode
                             root._pollReading = false
@@ -685,7 +693,9 @@ Timer {
                 sidebarEnabled:               root.sidebarEnabled,
                 bubblesEnabled:               root.bubblesEnabled,
                 idleMode:                     root.idleMode,
-                gamemodeActive:               root.gamemodeActive
+                gamemodeActive:               root.gamemodeActive,
+                dockEnabled:                  root.dockEnabled,
+                dockMode:                     root.dockMode
             }) + "' > \"$F\""]
         appearanceSettingsSaveExec.running = true
     }
@@ -2564,6 +2574,10 @@ pinned: root.pinned
                         onPinToggleRequested: root.pinned = !root.pinned
 bubblesEnabled: root.bubblesEnabled
                         onBubblesToggleRequested: root.bubblesEnabled = !root.bubblesEnabled
+dockEnabled: root.dockEnabled
+                        onDockEnabledToggleRequested: root.dockEnabled = !root.dockEnabled
+dockMode: root.dockMode
+                        onDockModeChangeRequested: function(mode) { root.dockMode = mode }
 idleMode: root.idleMode
                         onIdleModeToggleRequested: function(enabled) { root.idleMode = enabled }
 sidebarEnabled: root.sidebarEnabled
