@@ -32,6 +32,9 @@ signal bubblesToggleRequested()
     property bool idleMode: false
     signal sidebarToggleRequested()
     property bool sidebarEnabled: false
+    // Tracks which mode was last selected so the master toggle knows what to restore.
+    // "bar" = WorkspaceBubble+Systray, "dock" = BubbleDockWindow pill
+    property string lastBubbleMode: "bar"
     property bool appearanceMenuOpen: false
     property bool gamemodeCardFlipped: false
     property real capsuleOpacity: 0.20
@@ -3213,7 +3216,10 @@ Rectangle {
                     anchors.margins: 14
                     spacing: 10
 
-                    // ── Header: "Dock" label + on/off toggle ──────────
+                    // ── Header: "Bubble" label + on/off master toggle ────
+                    // The master toggle controls BOTH bar (WorkspaceBubble + SystrayBubble)
+                    // AND the dock pill. Turning it off disables everything.
+                    // Turning it on re-enables whichever mode (Bar or Dock) was selected.
                     Item {
                         width: parent.width
                         height: 24
@@ -3222,7 +3228,7 @@ Rectangle {
                             renderType:          Text.NativeRendering
                             anchors.left:        parent.left
                             anchors.verticalCenter: parent.verticalCenter
-                            text:  "Dock"
+                            text:  "Bubble"
                             color: controlCenter.textPrimary
                             font.pixelSize: 13
                             font.family:    controlCenter.textFontFamily
@@ -3237,7 +3243,8 @@ Rectangle {
                             Text {
                                 renderType:          Text.NativeRendering
                                 anchors.verticalCenter: parent.verticalCenter
-                                text:  "Enable"
+                                // "on" if either bar or dock is enabled
+                                text:  (controlCenter.bubblesEnabled || controlCenter.dockEnabled) ? "On" : "Off"
                                 color: controlCenter.textSecondary
                                 font.pixelSize: 10
                                 font.family:    controlCenter.textFontFamily
@@ -3247,54 +3254,84 @@ Rectangle {
                             Rectangle {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 34; height: 20; radius: 10
-                                color: controlCenter.dockEnabled ? StyleTokens.success : StyleTokens.switchOff
+                                // Active if either bar bubbles or dock pill is on
+                                readonly property bool anyEnabled: controlCenter.bubblesEnabled || controlCenter.dockEnabled
+                                color: anyEnabled ? StyleTokens.success : StyleTokens.switchOff
                                 Behavior on color { ColorAnimation { duration: StyleTokens.durationFast } }
 
                                 Rectangle {
                                     width: 16; height: 16; radius: 8; y: 2
-                                    x: controlCenter.dockEnabled ? 16 : 2
+                                    x: parent.anyEnabled ? 16 : 2
                                     color: StyleTokens.white
                                     Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                                 }
 
                                 MouseArea {
                                     anchors.fill: parent
-                                    onClicked: controlCenter.dockEnabledToggleRequested()
+                                    onClicked: {
+                                        const anyOn = controlCenter.bubblesEnabled || controlCenter.dockEnabled
+                                        if (anyOn) {
+                                            // Turn OFF everything — remember which mode was on
+                                            if (controlCenter.bubblesEnabled) {
+                                                controlCenter.lastBubbleMode = "bar"
+                                                controlCenter.bubblesToggleRequested()
+                                            }
+                                            if (controlCenter.dockEnabled) {
+                                                controlCenter.lastBubbleMode = "dock"
+                                                controlCenter.dockEnabledToggleRequested()
+                                            }
+                                        } else {
+                                            // Turn ON: restore last selected mode
+                                            if (controlCenter.lastBubbleMode === "dock") {
+                                                controlCenter.dockEnabledToggleRequested()
+                                                if (controlCenter.bubblesEnabled)
+                                                    controlCenter.bubblesToggleRequested()
+                                            } else {
+                                                // default: restore bar
+                                                controlCenter.bubblesToggleRequested()
+                                                if (controlCenter.dockEnabled)
+                                                    controlCenter.dockEnabledToggleRequested()
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // ── 2×2 bubble grid: [Bar|Dock] [Pin|Smart] ───────
-                    // Row 1: Bar / Dock (reserved for future bar-vs-dock choice)
-                    // Row 2: Pin / Smart (only visible when dock is enabled)
+                    // ── Mode grid: [Bar | Dock] then [Pin | Smart] when Dock active ──
+                    // Bar  = WorkspaceBubble + SystrayBubble only (dockEnabled=false, bubblesEnabled=true)
+                    // Dock = BubbleDockWindow pill only          (dockEnabled=true,  bubblesEnabled=false)
+                    // These are mutually exclusive. Enabling Bar removes Dock and vice-versa.
                     Grid {
                         width: parent.width
                         columns: 2
                         rowSpacing:    6
                         columnSpacing: 6
 
-                        // Bar bubble (placeholder / greyed when dock is on)
+                        // ── Bar bubble ────────────────────────────────────
+                        // Active when bubblesEnabled=true AND dockEnabled=false
                         Rectangle {
                             width:  (parent.width - 6) / 2
                             height: 36
                             radius: 12
-                            color:  !controlCenter.dockEnabled
+                            readonly property bool isActive: controlCenter.bubblesEnabled && !controlCenter.dockEnabled
+                            color:  isActive
                                     ? Qt.rgba(1,1,1,0.15)
                                     : (barBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
-                            border.color: !controlCenter.dockEnabled ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
+                            border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
-                            Behavior on color       { ColorAnimation { duration: 150 } }
+                            Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
 
                             Text {
                                 renderType:       Text.NativeRendering
                                 anchors.centerIn: parent
                                 text:  "Bar"
-                                color: !controlCenter.dockEnabled ? "white" : Qt.rgba(1,1,1,0.45)
+                                color: parent.isActive ? "white" : Qt.rgba(1,1,1,0.45)
                                 font.pixelSize: 12
                                 font.family:    controlCenter.textFontFamily
-                                font.weight:    !controlCenter.dockEnabled ? Font.DemiBold : Font.Normal
+                                font.weight:    parent.isActive ? Font.DemiBold : Font.Normal
                                 Behavior on color { ColorAnimation { duration: 150 } }
                             }
 
@@ -3304,36 +3341,39 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape:  Qt.PointingHandCursor
                                 onClicked: {
-                                    if (controlCenter.dockEnabled) {
+                                    // Switch to Bar: disable dock, enable bubbles
+                                    controlCenter.lastBubbleMode = "bar"
+                                    if (controlCenter.dockEnabled)
                                         controlCenter.dockEnabledToggleRequested()
-                                        if (!controlCenter.bubblesEnabled)
-                                            controlCenter.bubblesToggleRequested()
-                                    }
+                                    if (!controlCenter.bubblesEnabled)
+                                        controlCenter.bubblesToggleRequested()
                                 }
                             }
                         }
 
-                        // Dock bubble
+                        // ── Dock bubble ───────────────────────────────────
+                        // Active when dockEnabled=true AND bubblesEnabled=false
                         Rectangle {
                             width:  (parent.width - 6) / 2
                             height: 36
                             radius: 12
-                            color:  controlCenter.dockEnabled
+                            readonly property bool isActive: controlCenter.dockEnabled && !controlCenter.bubblesEnabled
+                            color:  isActive
                                     ? Qt.rgba(1,1,1,0.15)
                                     : (dockBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
-                            border.color: controlCenter.dockEnabled ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
+                            border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
-                            Behavior on color       { ColorAnimation { duration: 150 } }
+                            Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
 
                             Text {
                                 renderType:       Text.NativeRendering
                                 anchors.centerIn: parent
                                 text:  "Dock"
-                                color: controlCenter.dockEnabled ? "white" : Qt.rgba(1,1,1,0.45)
+                                color: parent.isActive ? "white" : Qt.rgba(1,1,1,0.45)
                                 font.pixelSize: 12
                                 font.family:    controlCenter.textFontFamily
-                                font.weight:    controlCenter.dockEnabled ? Font.DemiBold : Font.Normal
+                                font.weight:    parent.isActive ? Font.DemiBold : Font.Normal
                                 Behavior on color { ColorAnimation { duration: 150 } }
                             }
 
@@ -3343,41 +3383,42 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape:  Qt.PointingHandCursor
                                 onClicked: {
-                                    if (!controlCenter.dockEnabled) {
+                                    // Switch to Dock: enable dock, disable bar bubbles
+                                    controlCenter.lastBubbleMode = "dock"
+                                    if (!controlCenter.dockEnabled)
                                         controlCenter.dockEnabledToggleRequested()
-                                        if (controlCenter.bubblesEnabled)
-                                            controlCenter.bubblesToggleRequested()
-                                    }
+                                    if (controlCenter.bubblesEnabled)
+                                        controlCenter.bubblesToggleRequested()
                                 }
                             }
                         }
 
-                        // Pin bubble — only shown if dock enabled
+                        // ── Pin bubble — only shown when Dock is the active mode ──
                         Rectangle {
-                            width:  (parent.width - 6) / 2
-                            height: controlCenter.dockEnabled ? 36 : 0
+                            width:   (parent.width - 6) / 2
+                            height:  controlCenter.dockEnabled ? 36 : 0
                             opacity: controlCenter.dockEnabled ? 1 : 0
                             clip: true
                             radius: 12
-                            color:  controlCenter.dockEnabled && controlCenter.dockMode === "pin"
+                            readonly property bool isActive: controlCenter.dockEnabled && controlCenter.dockMode === "pin"
+                            color:  isActive
                                     ? Qt.rgba(1,1,1,0.15)
                                     : (pinBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
-                            border.color: controlCenter.dockEnabled && controlCenter.dockMode === "pin"
-                                          ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
+                            border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
-                            Behavior on height      { NumberAnimation { duration: IslandMotion.fast; easing.type: Easing.OutCubic } }
-                            Behavior on opacity     { NumberAnimation { duration: IslandMotion.fast } }
-                            Behavior on color       { ColorAnimation { duration: 150 } }
+                            Behavior on height       { NumberAnimation { duration: IslandMotion.fast; easing.type: Easing.OutCubic } }
+                            Behavior on opacity      { NumberAnimation { duration: IslandMotion.fast } }
+                            Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
 
                             Text {
                                 renderType:       Text.NativeRendering
                                 anchors.centerIn: parent
                                 text:  "Pin"
-                                color: (controlCenter.dockEnabled && controlCenter.dockMode === "pin") ? "white" : Qt.rgba(1,1,1,0.45)
+                                color: parent.isActive ? "white" : Qt.rgba(1,1,1,0.45)
                                 font.pixelSize: 12
                                 font.family:    controlCenter.textFontFamily
-                                font.weight:    (controlCenter.dockEnabled && controlCenter.dockMode === "pin") ? Font.DemiBold : Font.Normal
+                                font.weight:    parent.isActive ? Font.DemiBold : Font.Normal
                                 Behavior on color { ColorAnimation { duration: 150 } }
                             }
 
@@ -3390,32 +3431,32 @@ Rectangle {
                             }
                         }
 
-                        // Smart bubble — only shown if dock enabled
+                        // ── Smart bubble — only shown when Dock is the active mode ──
                         Rectangle {
-                            width:  (parent.width - 6) / 2
-                            height: controlCenter.dockEnabled ? 36 : 0
+                            width:   (parent.width - 6) / 2
+                            height:  controlCenter.dockEnabled ? 36 : 0
                             opacity: controlCenter.dockEnabled ? 1 : 0
                             clip: true
                             radius: 12
-                            color:  controlCenter.dockEnabled && controlCenter.dockMode === "smart"
+                            readonly property bool isActive: controlCenter.dockEnabled && controlCenter.dockMode === "smart"
+                            color:  isActive
                                     ? Qt.rgba(1,1,1,0.15)
                                     : (smartBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
-                            border.color: controlCenter.dockEnabled && controlCenter.dockMode === "smart"
-                                          ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
+                            border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
-                            Behavior on height      { NumberAnimation { duration: IslandMotion.fast; easing.type: Easing.OutCubic } }
-                            Behavior on opacity     { NumberAnimation { duration: IslandMotion.fast } }
-                            Behavior on color       { ColorAnimation { duration: 150 } }
+                            Behavior on height       { NumberAnimation { duration: IslandMotion.fast; easing.type: Easing.OutCubic } }
+                            Behavior on opacity      { NumberAnimation { duration: IslandMotion.fast } }
+                            Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
 
                             Text {
                                 renderType:       Text.NativeRendering
                                 anchors.centerIn: parent
                                 text:  "Smart"
-                                color: (controlCenter.dockEnabled && controlCenter.dockMode === "smart") ? "white" : Qt.rgba(1,1,1,0.45)
+                                color: parent.isActive ? "white" : Qt.rgba(1,1,1,0.45)
                                 font.pixelSize: 12
                                 font.family:    controlCenter.textFontFamily
-                                font.weight:    (controlCenter.dockEnabled && controlCenter.dockMode === "smart") ? Font.DemiBold : Font.Normal
+                                font.weight:    parent.isActive ? Font.DemiBold : Font.Normal
                                 Behavior on color { ColorAnimation { duration: 150 } }
                             }
 

@@ -133,7 +133,7 @@ Column {
             Text {
                 renderType: Text.NativeRendering
                 anchors.centerIn: parent
-                visible: root.mediaWorkspaceId >= 1
+                visible: root.mediaWorkspaceId >= 1 && root.activePlayer !== null
                 text: {
                     const id = root.activePlayer ? String(root.activePlayer.identity || "").toLowerCase() : ""
                     const name = (id.indexOf("ytm") >= 0 || id.indexOf("youtube") >= 0)
