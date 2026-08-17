@@ -100,6 +100,31 @@ Scope {
     }
 
     IpcHandler {
+        target: "focus-mode"
+
+        function toggle() {
+            shellRoot.forEachWindow((window) => {
+                if (window && typeof window.idleMode !== "undefined")
+                    window.idleMode = !window.idleMode
+            })
+        }
+
+        function enable() {
+            shellRoot.forEachWindow((window) => {
+                if (window && typeof window.idleMode !== "undefined")
+                    window.idleMode = true
+            })
+        }
+
+        function disable() {
+            shellRoot.forEachWindow((window) => {
+                if (window && typeof window.idleMode !== "undefined")
+                    window.idleMode = false
+            })
+        }
+    }
+
+    IpcHandler {
         target: "overview"
 
         function toggle() {
