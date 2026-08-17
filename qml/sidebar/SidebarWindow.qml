@@ -17,6 +17,12 @@ PanelWindow {
 
     property bool sidebarEnabled: false
 
+    // ── Dock ──────────────────────────────────────────────────────────
+    property bool   dockEnabled: false
+    property string dockMode:    "pin"
+    signal dockEnabledToggleRequested()
+    signal dockModeChangeRequested(string mode)
+
     // ── Gamemode — turns entire sidebar black ─────────────────────────
     property bool gamemodeActive: false
 
@@ -576,6 +582,11 @@ PanelWindow {
             root.capsuleOpacityValue = value
             root.saveAppearanceSettings()
         }
+        // Dock — forward signals up to SidebarWindow so shell.qml can wire them
+        dockEnabled: root.dockEnabled
+        dockMode:    root.dockMode
+        onDockEnabledToggleRequested: root.dockEnabledToggleRequested()
+        onDockModeChangeRequested:    function(mode) { root.dockModeChangeRequested(mode) }
     }
 
     // Runs gamemode.sh so the file toggle matches DynamicIslandWindow's keybind

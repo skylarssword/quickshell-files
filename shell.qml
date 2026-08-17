@@ -244,6 +244,11 @@ Scope {
             required property var modelData
             screen: modelData
             onSidebarEnabledChanged: shellRoot.sidebarActive = sidebarEnabled
+            // Dock state — read from shellRoot, write back via signals
+            dockEnabled: shellRoot.dockEnabled
+            dockMode:    shellRoot.dockMode
+            onDockEnabledToggleRequested: shellRoot.dockEnabled = !shellRoot.dockEnabled
+            onDockModeChangeRequested:    function(mode) { shellRoot.dockMode = mode }
         }
     }
 

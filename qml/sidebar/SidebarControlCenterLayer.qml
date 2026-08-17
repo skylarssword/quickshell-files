@@ -48,11 +48,15 @@ PanelWindow {
     signal appearanceOpacityRequested(real value)
     signal appearanceWalColorToggleRequested(bool enabled)
     signal appearanceWalColorIndexRequested(int index)
+    signal dockEnabledToggleRequested()
+    signal dockModeChangeRequested(string mode)
     property bool dndActive:      false
     property bool sidebarEnabled: true
     property bool appearanceMenuOpen: false
     property bool capsuleUseWalColor: false
     property var  capsuleWalColors:   []
+    property bool dockEnabled: false
+    property string dockMode:  "pin"
     property int  capsuleWalColorIndex: 0
     readonly property color capsuleWalColor: (capsuleWalColorIndex >= 0 && capsuleWalColorIndex < capsuleWalColors.length)
         ? capsuleWalColors[capsuleWalColorIndex] : "#000000"
@@ -902,6 +906,113 @@ PanelWindow {
                                         id: presetMouse2; anchors.fill: parent; hoverEnabled: true
                                         onClicked: root.appearanceOpacityRequested(parent.modelData)
                                     }
+                                }
+                            }
+                        }
+
+                        // ── Dock section ──────────────────────────────
+                        Item { width: parent.width; height: 1
+                            Rectangle { anchors.fill: parent; color: Qt.rgba(1,1,1,0.10) }
+                        }
+
+                        // Header: "Dock" + enable toggle
+                        Item {
+                            width: parent.width; height: 24
+                            Text {
+                                renderType: Text.NativeRendering
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Dock"
+                                color: root.textPrimary
+                                font.pixelSize: 13; font.family: root.textFontFamily
+                                font.weight: Font.DemiBold
+                            }
+                            Row {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 6
+                                Text {
+                                    renderType: Text.NativeRendering
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "Enable"
+                                    color: root.textSecondary
+                                    font.pixelSize: 10; font.family: root.textFontFamily
+                                    font.weight: Font.Medium
+                                }
+                                Rectangle {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 34; height: 20; radius: 10
+                                    color: root.dockEnabled ? StyleTokens.success : StyleTokens.switchOff
+                                    Behavior on color { ColorAnimation { duration: StyleTokens.durationFast } }
+                                    Rectangle {
+                                        width: 16; height: 16; radius: 8; y: 2
+                                        x: root.dockEnabled ? 16 : 2
+                                        color: StyleTokens.white
+                                        Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: root.dockEnabledToggleRequested()
+                                    }
+                                }
+                            }
+                        }
+
+                        // Pin / Smart mode bubbles (only when dock enabled)
+                        Grid {
+                            width: parent.width
+                            columns: 2; rowSpacing: 6; columnSpacing: 6
+                            visible: root.dockEnabled
+                            opacity: root.dockEnabled ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                            Rectangle {
+                                width: (parent.width - 6) / 2; height: 36; radius: 12
+                                color: root.dockEnabled && root.dockMode === "pin"
+                                    ? Qt.rgba(1,1,1,0.15)
+                                    : (sbPinMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
+                                border.color: root.dockEnabled && root.dockMode === "pin"
+                                    ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
+                                border.width: 1
+                                Behavior on color        { ColorAnimation { duration: 150 } }
+                                Behavior on border.color { ColorAnimation { duration: 150 } }
+                                Text {
+                                    renderType: Text.NativeRendering; anchors.centerIn: parent
+                                    text: "Pin"
+                                    color: (root.dockEnabled && root.dockMode === "pin") ? "white" : Qt.rgba(1,1,1,0.45)
+                                    font.pixelSize: 12; font.family: root.textFontFamily
+                                    font.weight: (root.dockEnabled && root.dockMode === "pin") ? Font.DemiBold : Font.Normal
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+                                MouseArea {
+                                    id: sbPinMouse; anchors.fill: parent
+                                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.dockModeChangeRequested("pin")
+                                }
+                            }
+
+                            Rectangle {
+                                width: (parent.width - 6) / 2; height: 36; radius: 12
+                                color: root.dockEnabled && root.dockMode === "smart"
+                                    ? Qt.rgba(1,1,1,0.15)
+                                    : (sbSmartMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
+                                border.color: root.dockEnabled && root.dockMode === "smart"
+                                    ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
+                                border.width: 1
+                                Behavior on color        { ColorAnimation { duration: 150 } }
+                                Behavior on border.color { ColorAnimation { duration: 150 } }
+                                Text {
+                                    renderType: Text.NativeRendering; anchors.centerIn: parent
+                                    text: "Smart"
+                                    color: (root.dockEnabled && root.dockMode === "smart") ? "white" : Qt.rgba(1,1,1,0.45)
+                                    font.pixelSize: 12; font.family: root.textFontFamily
+                                    font.weight: (root.dockEnabled && root.dockMode === "smart") ? Font.DemiBold : Font.Normal
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+                                MouseArea {
+                                    id: sbSmartMouse; anchors.fill: parent
+                                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.dockModeChangeRequested("smart")
                                 }
                             }
                         }
