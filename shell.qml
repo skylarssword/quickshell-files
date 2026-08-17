@@ -225,13 +225,17 @@ Scope {
             screen: modelData
             shellRootController: shellRoot
 
+            // Push shellRoot dock state DOWN into the island so sidebar/other sources are honoured
+            dockEnabled: shellRoot.dockEnabled
+            dockMode:    shellRoot.dockMode
+
             // Sync appearance state up to shellRoot so BubbleDockWindow can bind to it
             onGamemodeActiveChanged:      if (shellRoot.gamemodeActive     !== gamemodeActive)      shellRoot.gamemodeActive     = gamemodeActive
             onCapsuleOpacityChanged:      if (shellRoot.capsuleOpacity     !== capsuleOpacity)      shellRoot.capsuleOpacity     = capsuleOpacity
             onCapsuleUseWalColorChanged:  if (shellRoot.capsuleUseWalColor !== capsuleUseWalColor)  shellRoot.capsuleUseWalColor = capsuleUseWalColor
             onCapsuleWalColorChanged:     if (shellRoot.capsuleWalColor    !== capsuleWalColor)     shellRoot.capsuleWalColor    = capsuleWalColor
-            onDockEnabledChanged:         shellRoot.dockEnabled = dockEnabled
-            onDockModeChanged:            shellRoot.dockMode    = dockMode
+            onDockEnabledChanged:         { if (shellRoot.dockEnabled !== dockEnabled) shellRoot.dockEnabled = dockEnabled }
+            onDockModeChanged:            { if (shellRoot.dockMode    !== dockMode)    shellRoot.dockMode    = dockMode }
         }
     }
 

@@ -3310,12 +3310,12 @@ Rectangle {
                         columnSpacing: 6
 
                         // ── Bar bubble ────────────────────────────────────
-                        // Active when bubblesEnabled=true AND dockEnabled=false
+                        // Active when bubblesEnabled=true (independent of dock)
                         Rectangle {
                             width:  (parent.width - 6) / 2
                             height: 36
                             radius: 12
-                            readonly property bool isActive: controlCenter.bubblesEnabled && !controlCenter.dockEnabled
+                            readonly property bool isActive: controlCenter.bubblesEnabled
                             color:  isActive
                                     ? Qt.rgba(1,1,1,0.15)
                                     : (barBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
@@ -3341,23 +3341,19 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape:  Qt.PointingHandCursor
                                 onClicked: {
-                                    // Switch to Bar: disable dock, enable bubbles
-                                    controlCenter.lastBubbleMode = "bar"
-                                    if (controlCenter.dockEnabled)
-                                        controlCenter.dockEnabledToggleRequested()
-                                    if (!controlCenter.bubblesEnabled)
-                                        controlCenter.bubblesToggleRequested()
+                                    // Toggle bar bubbles independently — does not affect dock
+                                    controlCenter.bubblesToggleRequested()
                                 }
                             }
                         }
 
                         // ── Dock bubble ───────────────────────────────────
-                        // Active when dockEnabled=true AND bubblesEnabled=false
+                        // Active when dockEnabled=true (independent of bar)
                         Rectangle {
                             width:  (parent.width - 6) / 2
                             height: 36
                             radius: 12
-                            readonly property bool isActive: controlCenter.dockEnabled && !controlCenter.bubblesEnabled
+                            readonly property bool isActive: controlCenter.dockEnabled
                             color:  isActive
                                     ? Qt.rgba(1,1,1,0.15)
                                     : (dockBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
@@ -3383,12 +3379,8 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape:  Qt.PointingHandCursor
                                 onClicked: {
-                                    // Switch to Dock: enable dock, disable bar bubbles
-                                    controlCenter.lastBubbleMode = "dock"
-                                    if (!controlCenter.dockEnabled)
-                                        controlCenter.dockEnabledToggleRequested()
-                                    if (controlCenter.bubblesEnabled)
-                                        controlCenter.bubblesToggleRequested()
+                                    // Toggle dock independently — does not affect bar bubbles
+                                    controlCenter.dockEnabledToggleRequested()
                                 }
                             }
                         }

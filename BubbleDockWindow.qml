@@ -76,7 +76,7 @@ PanelWindow {
     }
 
     readonly property bool pillActuallyVisible:
-        root.dockEnabled && !root.sidebarActive
+        root.dockEnabled
         && (root.dockMode === "pin" || !root.anyWindowOpen || root.hoverPeeking)
 
     // Simple hover peeking — bottom strip sets true, clears on exit with debounce
