@@ -3398,8 +3398,8 @@ Rectangle {
                                     : (pinBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
                             border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
-                            Behavior on height       { NumberAnimation { duration: IslandMotion.fast; easing.type: Easing.OutCubic } }
-                            Behavior on opacity      { NumberAnimation { duration: IslandMotion.fast } }
+                            Behavior on height       { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                            Behavior on opacity      { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                             Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
 
@@ -3436,8 +3436,8 @@ Rectangle {
                                     : (smartBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
                             border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
-                            Behavior on height       { NumberAnimation { duration: IslandMotion.fast; easing.type: Easing.OutCubic } }
-                            Behavior on opacity      { NumberAnimation { duration: IslandMotion.fast } }
+                            Behavior on height       { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                            Behavior on opacity      { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                             Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
 

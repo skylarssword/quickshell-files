@@ -326,6 +326,20 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
 
     readonly property bool contentVisible: idleMode && !anyWindowOpen
 
+    // ── Top-HUD hover-reveal (mirrors BubbleDockWindow peek pattern) ──
+    // A thin invisible strip at the very top of the screen sets
+    // hoverPeeking = true; moving away starts a short debounce timer
+    // so crossing from strip onto the HUD items doesn't flash-hide them.
+    // Only the top elements (clock, workspace, bell/gear) respond to
+    // this — the media card is always visible whenever mediaVisible is true.
+    property bool hoverPeeking: false
+
+    Timer {
+        id: topHoverExitTimer
+        interval: 600; repeat: false
+        onTriggered: idleWindow.hoverPeeking = false
+    }
+
     // ── Window setup ─────────────────────────────────────────────────
     visible: idleMode
     color: StyleTokens.transparent
@@ -337,25 +351,41 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
     WlrLayershell.keyboardFocus: gearPopupOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     mask: Region {
+        // Top-edge peek strip — always present so hover enter fires even
+        // before the HUD is visible (mirrors BubbleDock's bottom strip).
         Region {
+            x: 0; y: 0
+            width: idleWindow.width
+            height: 8
+        }
+        // Clock cluster — only interactive when HUD is showing
+        Region {
+            intersection: Intersection.Combine
+            x: Math.floor(clockCluster.x)
+            y: Math.floor(clockCluster.y)
+            width: idleWindow.hoverPeeking ? Math.ceil(clockCluster.width) : 0
+            height: idleWindow.hoverPeeking ? Math.ceil(clockCluster.height) : 0
+        }
+        Region {
+            intersection: Intersection.Combine
             x: Math.floor(workspaceCluster.x)
             y: Math.floor(workspaceCluster.y)
-            width: Math.ceil(workspaceCluster.width)
-            height: Math.ceil(workspaceCluster.height)
+            width: idleWindow.hoverPeeking ? Math.ceil(workspaceCluster.width) : 0
+            height: idleWindow.hoverPeeking ? Math.ceil(workspaceCluster.height) : 0
         }
         Region {
             intersection: Intersection.Combine
             x: Math.floor(topRightCluster.x)
             y: Math.floor(topRightCluster.y)
-            width: Math.ceil(topRightCluster.width)
-            height: Math.ceil(topRightCluster.height)
+            width: idleWindow.hoverPeeking ? Math.ceil(topRightCluster.width) : 0
+            height: idleWindow.hoverPeeking ? Math.ceil(topRightCluster.height) : 0
         }
         Region {
             intersection: Intersection.Combine
             x: Math.floor(gearPopup.x)
             y: Math.floor(gearPopup.y)
-            width: idleWindow.gearPopupOpen ? Math.ceil(gearPopup.width) : 0
-            height: idleWindow.gearPopupOpen ? Math.ceil(gearPopup.height) : 0
+            width: (idleWindow.gearPopupOpen && idleWindow.hoverPeeking) ? Math.ceil(gearPopup.width) : 0
+            height: (idleWindow.gearPopupOpen && idleWindow.hoverPeeking) ? Math.ceil(gearPopup.height) : 0
         }
         Region {
             intersection: Intersection.Combine
@@ -364,6 +394,14 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
             width: idleWindow.mediaVisible ? Math.ceil(mediaCard.width) : 0
             height: idleWindow.mediaVisible ? Math.ceil(mediaCard.height) : 0
         }
+    }
+
+    // Top-edge peek strip — hover here to reveal/hold the top HUD
+    MouseArea {
+        anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+        height: 8; hoverEnabled: true; z: 10; acceptedButtons: Qt.NoButton
+        onEntered: { topHoverExitTimer.stop(); idleWindow.hoverPeeking = true }
+        onExited:  topHoverExitTimer.restart()
     }
 
     Item {
@@ -375,6 +413,31 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
         Behavior on opacity {
             NumberAnimation { duration: 220; easing.type: Easing.InOutQuad }
         }
+
+        // ── Top HUD: clock, workspace, bell/gear — hover-reveal ─────
+        // Fades in when the mouse enters the top-edge peek strip and
+        // holds while the cursor stays anywhere over the HUD items.
+        // The media card is intentionally excluded and always visible.
+        Item {
+            id: topHud
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 100   // tall enough to cover clock + gear popup trigger zone
+            opacity: idleWindow.hoverPeeking ? 1 : 0
+            visible: opacity > 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
+            }
+
+            // Keep hoverPeeking alive while the cursor is anywhere over this Item
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true; acceptedButtons: Qt.NoButton; propagateComposedEvents: true
+                onEntered: { topHoverExitTimer.stop(); idleWindow.hoverPeeking = true }
+                onExited:  topHoverExitTimer.restart()
+            }
 
         // ── Top-left: clock + date ───────────────────────────────────
         // Pixel-lockscreen-style single line: big time, small AM/PM
@@ -753,6 +816,8 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                 }
             }
         }
+
+        } // end topHud
 
         // ── Bottom-left: media card ──────────────────────────────────
         Rectangle {
