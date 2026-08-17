@@ -311,6 +311,7 @@ PanelWindow {
                             appIcon:     icon
                         })
                     }
+                    result.sort(function(a, b) { return a.appAddress < b.appAddress ? -1 : 1 })
                     root.activeApps = result
                     root.allWindows = allWin
 
@@ -523,7 +524,7 @@ PanelWindow {
 
         MouseArea {
             id: btnMouse
-            anchors.fill: iconArea; anchors.margins: -4
+            anchors.fill: iconArea
             hoverEnabled: true; cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
             onEntered: { appBtn.hov = true; hoverExitTimer.stop(); root.hoverPeeking = true }
@@ -636,9 +637,10 @@ PanelWindow {
                     isRunning: true
                     onTapped:        root.focusWindow(modelData.appAddress, modelData.appClass)
                     onMiddleClicked: {
-                        const raw = String(modelData.appAddress || "").trim().toLowerCase()
-                        const hex = raw.startsWith("0x") ? raw : "0x" + raw
-                        Hyprland.dispatch("hl.dsp.window.close({ address = \"" + hex + "\" })")
+                        let raw = String(modelData.appAddress).trim().toLowerCase()
+                        if (!raw.startsWith("0x")) raw = "0x" + raw
+                        const sel = "address:" + raw
+                        Hyprland.dispatch("hl.dsp.window.close({ window = \"" + sel + "\" })")
                     }
                 }
             }

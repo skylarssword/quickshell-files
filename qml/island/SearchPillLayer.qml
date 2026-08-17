@@ -326,6 +326,7 @@ Item {
 
                 TextInput {
                     id: searchInput
+                    renderType: TextInput.NativeRendering
                     width: root.capsuleWidth - 60
                     height: 38
                     color: "white"
