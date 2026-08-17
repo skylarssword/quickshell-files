@@ -1,9 +1,6 @@
 import QtQuick
 import "../shared"
 
-// Power button icon for the sidebar pill — opens SidebarPowerLayer.
-// Uses the same Arch/power glyph (\uf011) as PowerMenuLayer.
-
 Item {
     id: root
 

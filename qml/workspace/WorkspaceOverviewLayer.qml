@@ -91,8 +91,6 @@ Item {
     implicitWidth: overviewCard.implicitWidth
     implicitHeight: overviewCard.implicitHeight
 
-    // ── helpers ──────────────────────────────────────────────
-
     function findMonitorData(monId) {
         const mons = hyprlandData && hyprlandData.monitors ? hyprlandData.monitors : []
         for (let i = 0; i < mons.length; i++)
@@ -134,8 +132,6 @@ Item {
         return { x:Math.round(clamp(ux+lx,ux,mxX)), y:Math.round(clamp(uy+ly,uy,mxY)) }
     }
 
-    // ── window-address-at-point (used by overlay) ────────────
-
     function windowAddressAtPoint(px, py) {
         const ba = hyprlandData && hyprlandData.windowByAddress ? hyprlandData.windowByAddress : {}
         const wm = monitorData
@@ -168,8 +164,6 @@ Item {
         return ""
     }
 
-    // ── move-hint management ─────────────────────────────────
-
     function windowMoveHint(addr) {
         const k = String(addr||"").toLowerCase()
         return windowMoveHints && windowMoveHints[k] ? windowMoveHints[k] : null
@@ -201,8 +195,6 @@ Item {
         }
         if (changed) windowMoveHints = nh
     }
-
-    // ── toplevel management ──────────────────────────────────
 
     function normalizeToplevelAddress(tlv) {
         const ra = tlv && tlv.HyprlandToplevel ? String(tlv.HyprlandToplevel.address||"") : ""
@@ -248,8 +240,6 @@ Item {
         function onWindowByAddressChanged() { root.clearMatchedWindowMoveHints(); root.scheduleRefresh() }
     }
 
-    // ── visual ───────────────────────────────────────────────
-
     Behavior on opacity { NumberAnimation { duration: showCondition?180:120; easing.type: Easing.InOutQuad } }
 
     Rectangle {
@@ -274,8 +264,6 @@ Item {
             width: implicitWidth; height: implicitHeight
             implicitWidth: workspaceColumnLayout.implicitWidth
             implicitHeight: workspaceColumnLayout.implicitHeight
-
-            // ── workspace cells (rendering only, no interaction) ──
 
             Column {
                 id: workspaceColumnLayout
@@ -379,13 +367,9 @@ Item {
                 }
             }
 
-            // ── windowSpace: draggable tiles + overlay ────────
-
             Item {
                 id: windowSpace
                 anchors.fill: workspaceColumnLayout
-
-                // ── overlay: single entry-point for all clicks ──
 
                 MouseArea {
                     id: overlay
@@ -419,8 +403,6 @@ acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                     }
                     onContainsMouseChanged: { if (!containsMouse) root.hoveredAddress = "" }
                 }
-
-                // ── draggable window tiles (drag only) ─────────
 
                 Repeater {
                     model: root.windowToplevels
@@ -468,8 +450,6 @@ acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                         bottomLeftRadius: Math.max((atL&&atB?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distL,distB), root.windowCornerRadius)
                         bottomRightRadius: Math.max((atR&&atB?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distR,distB), root.windowCornerRadius)
                         z: Drag.active?99999:(windowData&&windowData.fullscreen?30:20)+(windowData&&windowData.floating?5:0)
-
-                        // ── settle helpers ──
 
                         Timer { id: restoreTimer; interval:80; repeat:false; onTriggered:{ dragTile.x=Math.round(dragTile.initX); dragTile.y=Math.round(dragTile.initY) } }
                         Timer { id: settleTimer; interval:700; repeat:false
@@ -586,8 +566,6 @@ acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                         }
                     }
                 }
-
-                // ── focused workspace indicator ─────────────────
 
                 Rectangle {
                     id: focusInd

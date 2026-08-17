@@ -8,49 +8,9 @@ import Quickshell.Services.Mpris
 import Qt5Compat.GraphicalEffects
 import IslandBackend
 
-// ── Idle overlay ──────────────────────────────────────────────────────
-// Standalone PanelWindow shown only while root.idleMode is true. Reads
-// a handful of properties passed in from DynamicIslandWindow.qml and
-// renders its own minimal chrome: clock/date top-left, live workspace
-// dots + title top-center (pulled directly from Hyprland, same as
-// WorkspaceBubble.qml), notification bell + gear top-right, and a
-// media card bottom-left that only appears when something is playing
-// and the media widget is enabled in the gear popup.
-//
-// Entire layer fades out whenever the active workspace on this monitor
-// has ANY window open — floating or tiled, fullscreen or not.
-//
-// Text/icon color for elements sitting directly on the wallpaper (bell/
-// gear, workspace label + dots) still adapts to wallpaper brightness,
-// read directly from the UserConfig singleton. The clock/date cluster
-// is a fixed white (Pixel lock-screen style) with its own drop shadows.
-// Every white/adaptive-white text element (and the white workspace
-// dots) carries a soft black drop shadow so it stays legible on bright
-// wallpaper regions.
-//
-// Every Text {} in this file uses renderType: Text.NativeRendering to
-// avoid the chromatic-aberration edge artifacts of the default
-// distance-field renderer. All non-icon text uses the "Google Sans Flex
-// Freeze" font family (only the Regular weight is installed, so no
-// font.weight overrides are used anywhere — same plain-weight approach
-// Pixie SDDM itself uses for most of its text).
-//
-// Lyrics: on every track change, lyricManager.fetch() runs immediately
-// (this resets any stale state from the previous track right away, then
-// resolves via its own cache-or-LRCLib fallback in the background). In
-// parallel, MPRIS inline metadata is checked synchronously and — if it's
-// LRC-formatted — wins immediately, since that resolves faster than any
-// async cache read or network call. When synced lines are available the
-// media card grows to show the previous/current/next line; otherwise it
-// stays in its regular compact state.
-
 PanelWindow {
     id: idleWindow
 
-    // Shared "black drop shadow on white text" component. Inline
-    // components must be declared inside the root object's body (not as
-    // a sibling before it) — referenced via layer.effect on every
-    // white/adaptive-white Text and on the white workspace dots.
     component TextShadow: DropShadow {
         color: "#000000"
         radius: 5
@@ -61,7 +21,6 @@ PanelWindow {
         opacity: 0.6
     }
 
-    // ── Wired in from DynamicIslandWindow.qml ───────────────────────
     property var hyprMonitor: null
     property string hyprMonitorName: hyprMonitor && hyprMonitor.name ? String(hyprMonitor.name) : ""
 
@@ -85,12 +44,10 @@ PanelWindow {
 
 readonly property string iconFontFamily: UserConfig.iconFontFamily
 
-    // Load custom TTF directly into Qt engine — paths from IslandConfiguration
     FontLoader { id: flexFontRegular; source: IslandConfiguration.fontRegular }
     FontLoader { id: flexFontMedium;  source: IslandConfiguration.fontMedium }
     FontLoader { id: flexFontBold;    source: IslandConfiguration.fontBold }
 
-    // Dynamically fallback to font loader's name or exact family string
     readonly property string flexRoundedFamily: flexFontRegular.name !== "" ? flexFontRegular.name : "Google Sans Flex Freeze"
     
     property bool gearPopupOpen: false
@@ -103,7 +60,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
         && lyricManager.lines
         && lyricManager.lines.length > 0
 
-    // ── Live workspace list (same source pattern as WorkspaceBubble.qml) ──
     readonly property var monitorWorkspaces: {
         if (!Hyprland.workspaces || !Hyprland.workspaces.values) return []
         const all = Hyprland.workspaces.values
@@ -113,7 +69,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
         return filtered.sort((a, b) => a.id - b.id)
     }
 
-    // ── Any-window detection (fullscreen OR floating OR tiled) ──────────
     property bool anyWindowOpen: false
 
     Process {
@@ -130,7 +85,7 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     const count = Number(parsed.windows)
                     idleWindow.anyWindowOpen = !isNaN(count) && count > 0
                 } catch (e) {
-                    // leave last known value on parse failure
+                    
                 }
             }
         }
@@ -144,7 +99,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
         onTriggered: if (!windowCountQuery.running) windowCountQuery.running = true
     }
 
-    // ── Wallpaper brightness sampling (still used by workspace/bell/gear) ──
     readonly property string wallpaperPath: UserConfig.wallpaperPath
     property real wallpaperBrightness: 50
     readonly property color adaptiveOnWallpaperColor: wallpaperBrightness > 55 ? "#1c1c1c" : "#ffffff"
@@ -172,21 +126,15 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
     onWallpaperPathChanged: if (idleMode) wallpaperBrightnessQuery.run(wallpaperPath)
     onIdleModeChanged: if (idleMode) wallpaperBrightnessQuery.run(wallpaperPath)
 
-    // ── Clock/date parsing ────────────────────────────────────────────
-    // timeText arrives as e.g. "03:46 PM" (12h) or "15:46" / "03:46:12"
-    // depending on upstream formatting — handle both gracefully.
     readonly property var _timeMatch: /^(\d{1,2}:\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/.exec(idleWindow.timeText || "")
     readonly property string clockTimePart: idleWindow._timeMatch ? idleWindow._timeMatch[1] : idleWindow.timeText
     readonly property string clockMeridiemPart: (idleWindow._timeMatch && idleWindow._timeMatch[2]) ? idleWindow._timeMatch[2].toUpperCase() : ""
 
-    // dateText arrives as e.g. "Sat, Jul 25"
     readonly property var _dateMatch: /^(\w+)\s*,\s*(\w+)\s*(\d+)$/.exec(idleWindow.dateText || "")
     readonly property string dateWeekdayPart: idleWindow._dateMatch ? idleWindow._dateMatch[1] : (idleWindow.dateText || "")
     readonly property string dateMonthPart: idleWindow._dateMatch ? idleWindow._dateMatch[2].toUpperCase() : ""
     readonly property string dateDayPart: idleWindow._dateMatch ? idleWindow._dateMatch[3] : ""
 
-    // ── Lyrics: reset-and-refetch immediately on track change, with an
-    // MPRIS-inline override attempted synchronously alongside it ────────
     function _looksSynced(raw) {
         return !!raw && /\[\d{2}:\d{2}/.test(raw)
     }
@@ -199,20 +147,14 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
 
     onCurrentTrackChanged: {
         if (!lyricManager || !showLyricsEnabled || currentTrack === "") return
-        // fetch() resets stale lines/backendStatus immediately, then
-        // resolves via its own cache-or-LRCLib fallback in the background.
+        
         lyricManager.fetch(currentArtist, currentTrack, inlineLyricsRaw)
-        // If MPRIS already has LRC-formatted metadata, this wins instantly
-        // since it runs synchronously — before any async cache/network
-        // result can land.
+        
         _tryMprisInline()
     }
 
-    // Some players populate metadata a beat after the track-changed signal
-    // fires — catch that case reactively instead of on a fixed timer.
     onInlineLyricsRawChanged: _tryMprisInline()
 
-    // ── Active lyric line tracking ───────────────────────────────────
     property int lyricActiveIndex: -1
 
     function _positionToMs(rawPos) {
@@ -283,7 +225,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
         idleWindow.trackProgressLocal = clamped
     }
 
-    // ── Transport helpers ────────────────────────────────────────────
     function togglePlayback() {
         const p = idleWindow.activePlayer
         if (!p || !p.canControl) return
@@ -326,12 +267,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
 
     readonly property bool contentVisible: idleMode && !anyWindowOpen
 
-    // ── Top-HUD hover-reveal (mirrors BubbleDockWindow peek pattern) ──
-    // A thin invisible strip at the very top of the screen sets
-    // hoverPeeking = true; moving away starts a short debounce timer
-    // so crossing from strip onto the HUD items doesn't flash-hide them.
-    // Only the top elements (clock, workspace, bell/gear) respond to
-    // this — the media card is always visible whenever mediaVisible is true.
     property bool hoverPeeking: false
 
     Timer {
@@ -340,7 +275,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
         onTriggered: idleWindow.hoverPeeking = false
     }
 
-    // ── Window setup ─────────────────────────────────────────────────
     visible: idleMode
     color: StyleTokens.transparent
     anchors { top: true; left: true; right: true; bottom: true }
@@ -351,14 +285,13 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
     WlrLayershell.keyboardFocus: gearPopupOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     mask: Region {
-        // Top-edge peek strip — always present so hover enter fires even
-        // before the HUD is visible (mirrors BubbleDock's bottom strip).
+        
         Region {
             x: 0; y: 0
             width: idleWindow.width
             height: 8
         }
-        // Clock cluster — only interactive when HUD is showing
+        
         Region {
             intersection: Intersection.Combine
             x: Math.floor(clockCluster.x)
@@ -396,7 +329,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
         }
     }
 
-    // Top-edge peek strip — hover here to reveal/hold the top HUD
     MouseArea {
         anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
         height: 8; hoverEnabled: true; z: 10; acceptedButtons: Qt.NoButton
@@ -414,16 +346,12 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
             NumberAnimation { duration: 220; easing.type: Easing.InOutQuad }
         }
 
-        // ── Top HUD: clock, workspace, bell/gear — hover-reveal ─────
-        // Fades in when the mouse enters the top-edge peek strip and
-        // holds while the cursor stays anywhere over the HUD items.
-        // The media card is intentionally excluded and always visible.
         Item {
             id: topHud
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: 100   // tall enough to cover clock + gear popup trigger zone
+            height: 100   
             opacity: idleWindow.hoverPeeking ? 1 : 0
             visible: opacity > 0
 
@@ -431,7 +359,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                 NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
             }
 
-            // Keep hoverPeeking alive while the cursor is anywhere over this Item
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: true; acceptedButtons: Qt.NoButton; propagateComposedEvents: true
@@ -439,19 +366,12 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                 onExited:  topHoverExitTimer.restart()
             }
 
-        // ── Top-left: clock + date ───────────────────────────────────
-        // Pixel-lockscreen-style single line: big time, small AM/PM
-        // offset up-right of it, a thick rounded separator pill (with
-        // its own drop shadow), then the date laid out horizontally
-        // (MONTH DAY weekday) instead of stacked. Fixed white, left
-        // aligned, every piece still carries the same soft drop shadow.
         Row {
             id: clockCluster
             x: 30
             y: 18
             spacing: 14
 
-            // Time + AM/PM
             Row {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 5
@@ -486,7 +406,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                 }
             }
 
-            // Thick rounded separator pill
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 5
@@ -498,7 +417,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                 layer.effect: TextShadow {}
             }
 
-            // Date — horizontal: MONTH DAY weekday
             Row {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
@@ -541,7 +459,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
             }
         }
 
-        // ── Top-center: live workspace dots + title ──────────────────
         Column {
             id: workspaceCluster
             anchors.horizontalCenter: parent.horizontalCenter
@@ -595,7 +512,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
             }
         }
 
-        // ── Top-right: notification bell + gear ──────────────────────
         Row {
             id: topRightCluster
             anchors.right: parent.right
@@ -671,7 +587,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
             }
         }
 
-        // ── Gear popup ────────────────────────────────────────────────
         Rectangle {
             id: gearPopup
             anchors.right: parent.right
@@ -817,9 +732,8 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
             }
         }
 
-        } // end topHud
+        } 
 
-        // ── Bottom-left: media card ──────────────────────────────────
         Rectangle {
             id: mediaCard
             x: 30
@@ -845,7 +759,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                 anchors.margins: 16
                 spacing: 12
 
-                // ── Art + track info (text wraps to 2 lines if needed) ──
                 Row {
                     width: parent.width
                     spacing: 14
@@ -877,7 +790,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                             maskSource: artMask
                         }
 
-                        // Circular hairline outline, shares the shell's border tokens
                         Rectangle {
                             anchors.fill: parent
                             radius: width / 2
@@ -923,7 +835,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     }
                 }
 
-                // ── Seek bar / playhead ───────────────────────────────
                 Item {
                     width: parent.width
                     height: 16
@@ -963,7 +874,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                             }
                         }
 
-                        // Playhead knob
                         Rectangle {
                             width: 10; height: 10; radius: 5
                             color: "white"
@@ -1006,7 +916,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     }
                 }
 
-                // ── Synced lyric block (prev / current / next) ───────
                 Column {
                     width: parent.width
                     height: idleWindow.lyricsAvailable ? implicitHeight : 0
@@ -1060,12 +969,10 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     }
                 }
 
-                // ── Transport row: shuffle, prev, play/pause, next, loop ──
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 26
 
-                    // Shuffle
                     Item {
                         width: 20; height: 20
                         opacity: idleWindow.activePlayer && idleWindow.activePlayer.shuffle ? 1.0 : 0.35
@@ -1096,7 +1003,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         }
                     }
 
-                    // Previous track
                     Item {
                         width: 24; height: 24
                         scale: prevMouse.pressed ? 0.82 : (prevMouse.containsMouse ? 1.1 : 1.0)
@@ -1130,7 +1036,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         }
                     }
 
-                    // Play / pause
                     Item {
                         width: 26; height: 26
                         scale: playMouse.pressed ? 0.82 : (playMouse.containsMouse ? 1.1 : 1.0)
@@ -1163,7 +1068,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         }
                     }
 
-                    // Next track
                     Item {
                         width: 24; height: 24
                         scale: nextMouse.pressed ? 0.82 : (nextMouse.containsMouse ? 1.1 : 1.0)
@@ -1197,7 +1101,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         }
                     }
 
-                    // Loop
                     Item {
                         width: 20; height: 20
                         opacity: idleWindow.activePlayer && idleWindow.activePlayer.loopState !== MprisLoopState.None ? 1.0 : 0.35

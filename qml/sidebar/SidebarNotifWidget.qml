@@ -3,10 +3,6 @@ import Quickshell
 import IslandBackend
 import "../shared"
 
-// ── Notification bell button inside the sidebar pill ─────────────────────────
-// SVG assets from SystrayBubble. Shakes on new notification (call shake()).
-// Badge shows unread count. Right-click toggles DND.
-
 Item {
     id: root
 
@@ -51,7 +47,6 @@ Item {
         }
     }
 
-    // Unread count badge
     Rectangle {
         visible: root.unreadCount > 0 && !root.dndActive
         anchors.top:   bellImg.top

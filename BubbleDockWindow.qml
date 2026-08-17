@@ -10,7 +10,6 @@ import "qml/shared"
 PanelWindow {
     id: root
 
-    // ── Props ─────────────────────────────────────────────────────────
     property bool   dockEnabled:        true
     property string dockMode:           "pin"
     property bool   sidebarActive:      false
@@ -21,13 +20,11 @@ PanelWindow {
     property string iconFontFamily:     ""
     property string textFontFamily:     ""
 
-    // ── Geometry ─────────────────────────────────────────────────────
     readonly property int iconSize: 44
     readonly property int pillH:    64
     readonly property int edgePad:  14
     readonly property int iconGap:  8
 
-    // ── Window ────────────────────────────────────────────────────────
     exclusiveZone: 0
     aboveWindows:  true
     color:         "transparent"
@@ -54,7 +51,6 @@ PanelWindow {
             ? Qt.rgba(root.capsuleWalColor.r, root.capsuleWalColor.g, root.capsuleWalColor.b, root.capsuleOpacity)
             : Qt.rgba(0, 0, 0, root.capsuleOpacity))
 
-    // ── Smart-mode window count ───────────────────────────────────────
     property bool anyWindowOpen: false
 
     Process {
@@ -79,8 +75,6 @@ PanelWindow {
         root.dockEnabled
         && (root.dockMode === "pin" || !root.anyWindowOpen || root.hoverPeeking)
 
-    // Simple hover peeking — bottom strip sets true, clears on exit with debounce
-    // so moving mouse from strip onto the pill doesn't immediately hide it.
     property bool hoverPeeking: false
 
     Timer {
@@ -89,7 +83,6 @@ PanelWindow {
         onTriggered: root.hoverPeeking = false
     }
 
-    // Bottom-edge peek strip
     MouseArea {
         anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
         height: 8; hoverEnabled: true; z: -1
@@ -97,9 +90,6 @@ PanelWindow {
         onExited:  hoverExitTimer.restart()
     }
 
-    // ── App data ──────────────────────────────────────────────────────
-    // _appIconMap: built from list-apps.py output so active window icons
-    // use GTK-resolved paths instead of a slow bash find fallback.
     property var _appIconMap: ({})
 
     function _buildIconMap(appList) {
@@ -123,12 +113,8 @@ PanelWindow {
         return map
     }
 
-    // ── Favorites ─────────────────────────────────────────────────────
     property bool _pendingFavReload: false
 
-    // Simple chain identical to the original: loadFavProc always triggers
-    // loadAppsProc unconditionally. loadAppsProc filters with current favoritesSet.
-    // No caching, no guards, no flags — just like the original that worked.
     property var favApps:      []
     property var favoritesSet: ({})
 
@@ -151,8 +137,7 @@ PanelWindow {
                 const rawSnap = loadFavProc._buf.trim().slice(0, 120)
                 loadFavProc._buf = ""
                 root._pendingFavReload = false
-                // Always need loadAppsProc to refilter — if it's already running,
-                // set pending so it re-runs the full chain when it finishes.
+                
                 if (loadAppsProc.running) {
                     root._pendingFavReload = true
                 } else {
@@ -172,9 +157,9 @@ PanelWindow {
                 try {
                     const parsed = JSON.parse(loadAppsProc._buf)
                     if (Array.isArray(parsed)) {
-                        // Build icon map for active window icon resolution
+                        
                         root._appIconMap = root._buildIconMap(parsed)
-                        // Filter to favorites using current favoritesSet
+                        
                         root.favApps = parsed
                             .filter(function(a) { return root.favoritesSet[a.exec || ""] === true })
                             .map(function(a) {
@@ -198,7 +183,6 @@ PanelWindow {
 
     Component.onCompleted: loadFavProc.running = true
 
-    // Safety net: re-run the chain every 5s if favApps count is wrong
     Timer {
         interval: 5000; repeat: true; running: root.dockEnabled
         onTriggered: {
@@ -210,8 +194,6 @@ PanelWindow {
         }
     }
 
-    // Poll favorites file every 3s for changes — more reliable than FileView
-    // since FileView with preload:false may not activate its watcher.
     property string _lastFavRaw: ""
     Timer {
         interval: 3000; repeat: true; running: root.dockEnabled
@@ -233,7 +215,7 @@ PanelWindow {
                 favPollProc._buf = ""
                 if (raw !== root._lastFavRaw) {
                     root._lastFavRaw = raw
-                    // Parse and update directly
+                    
                     try {
                         const p    = JSON.parse(raw || "{}")
                         const favs = Array.isArray(p.favorites) ? p.favorites : []
@@ -247,12 +229,8 @@ PanelWindow {
         }
     }
 
-    // ── Active windows ────────────────────────────────────────────────
-    // BUG FIX: Show ALL windows, not one per class.
-    // Each window gets its own button with its own address for focus.
-    // Deduplication is by ADDRESS (unique), not class.
     property var activeApps:   []
-    property var allWindows:   []   // ALL open windows unfiltered — for fav isRunning + focus
+    property var allWindows:   []   
     property var _activeIconCache: ({})
     property var _iconQueue:       []
 
@@ -279,10 +257,8 @@ PanelWindow {
                         if (!addr || seenAddr[addr]) continue
                         seenAddr[addr] = true
 
-                        // Store in allWindows before any filtering
                         allWin.push({ appClass: cls, appClassLow: clsLow, appAddress: addr })
 
-                        // Skip if already shown as a favourite
                         let inFav = false
                         for (let j = 0; j < root.favApps.length; j++) {
                             const f   = root.favApps[j]
@@ -293,7 +269,6 @@ PanelWindow {
                         }
                         if (inFav) continue
 
-                        // Icon: try GTK map first, then persistent cache, then queue bash lookup
                         const mapIcon   = root._appIconMap[clsLow] || root._appIconMap[ttl.toLowerCase()] || ""
                         const cacheIcon = root._activeIconCache[clsLow] || ""
                         const icon      = mapIcon || cacheIcon
@@ -315,7 +290,6 @@ PanelWindow {
                     root.activeApps = result
                     root.allWindows = allWin
 
-                    // Queue bash icon lookups only for windows with no icon yet
                     for (let i = 0; i < result.length; i++) {
                         const w = result[i]
                         if (!w.appIcon) {
@@ -335,7 +309,6 @@ PanelWindow {
         onTriggered: if (!activeAppsQuery.running) activeAppsQuery.running = true
     }
 
-    // Bash fallback icon lookup (only runs when GTK map didn't have the icon)
     Process {
         id: iconLookupProc
         property string _appClass: ""
@@ -351,7 +324,7 @@ PanelWindow {
                     const cache = Object.assign({}, root._activeIconCache)
                     cache[cls] = found
                     root._activeIconCache = cache
-                    // Patch ALL windows with this class (multiple kitty windows, etc.)
+                    
                     root.activeApps = root.activeApps.map(function(a) {
                         if (a.appClassLow !== cls) return a
                         return Object.assign({}, a, { appIcon: found })
@@ -377,13 +350,13 @@ PanelWindow {
         iconLookupProc._appClass = cls
         iconLookupProc.command = ["bash", "-c",
             "n='" + cls + "'; " +
-            // 1. TSV cache
+            
             "f=\"$HOME/.cache/quickshell/dock-apps-v2.tsv\"; " +
             "if [ -f \"$f\" ]; then " +
               "r=$(awk -F'\\t' -v n=\"$n\" '{ ln=tolower($1); if (index(ln, n) > 0 && $3 != \"\") { print $3; exit } }' \"$f\"); " +
               "[ -n \"$r\" ] && echo \"$r\" && exit 0; " +
             "fi; " +
-            // 2. Direct icon search by class name
+            
             "icon=$(find /usr/share/icons /usr/share/pixmaps $HOME/.local/share/icons $HOME/.local/share/pixmaps 2>/dev/null " +
               "-type f \\( -name \"${n}.png\" -o -name \"${n}.svg\" -o -name \"${n}.xpm\" \\) " +
               "| grep -i '48x48\\|scalable\\|256x256\\|128x128' | head -1); " +
@@ -391,13 +364,13 @@ PanelWindow {
               "icon=$(find /usr/share/icons /usr/share/pixmaps $HOME/.local/share/icons $HOME/.local/share/pixmaps 2>/dev/null " +
               "-type f \\( -name \"${n}.png\" -o -name \"${n}.svg\" \\) | head -1); " +
             "[ -n \"$icon\" ] && echo \"$icon\" && exit 0; " +
-            // 3. Find .desktop by FILENAME containing class (e.g. net.lutris.reverse-1999-game-8.desktop)
+            
             "desktop=$(find /usr/share/applications $HOME/.local/share/applications 2>/dev/null " +
               "-name \"*${n}*.desktop\" -type f | head -1); " +
-            // 4. Search by StartupWMClass= content (exact)
+            
             "[ -z \"$desktop\" ] && " +
               "desktop=$(grep -rli \"^StartupWMClass=${n}$\" /usr/share/applications $HOME/.local/share/applications 2>/dev/null | head -1); " +
-            // 5. Search by StartupWMClass= partial / Name= / Exec=
+            
             "[ -z \"$desktop\" ] && " +
               "desktop=$(grep -rli \"^StartupWMClass=.*${n}\\|^Name=.*${n}\\|^Exec=.*${n}\" /usr/share/applications $HOME/.local/share/applications 2>/dev/null | head -1); " +
             "if [ -n \"$desktop\" ]; then " +
@@ -416,7 +389,6 @@ PanelWindow {
         iconLookupProc.running = true
     }
 
-    // ── Focus window — Hyprland Lua API ──────────────────────────────
     function focusWindow(addr, clsOrig) {
         let selector = ""
         if (addr && addr !== "") {
@@ -430,24 +402,20 @@ PanelWindow {
             Hyprland.dispatch("hl.dsp.focus({ window = \"" + selector + "\" })")
     }
 
-    // ── Launch ────────────────────────────────────────────────────────
     Process { id: launchProc }
     function launch(cmd) {
         launchProc.command = ["bash", "-c", "nohup " + cmd + " &"]
         launchProc.running = true
     }
 
-    // ── Systray ───────────────────────────────────────────────────────
     property bool systrayOpen: false
 
-    // ── Divider ───────────────────────────────────────────────────────
     component DockDivider: Rectangle {
         width: 1; height: 36; radius: 1
         color: IslandMotion.surfaceBorderColor
         anchors.verticalCenter: parent ? parent.verticalCenter : undefined
     }
 
-    // ── App button ────────────────────────────────────────────────────
     component AppButton: Item {
         id: appBtn
         property string iconPath:  ""
@@ -459,14 +427,12 @@ PanelWindow {
         width: root.iconSize; height: root.iconSize
         property bool hov: false
 
-        // Appear animation — scale+fade in when button is created
         opacity: 0
         scale: 0.5
         Component.onCompleted: { opacity = 1; scale = 1 }
         Behavior on opacity { NumberAnimation { duration: IslandMotion.standard; easing.type: Easing.OutCubic } }
         Behavior on scale   { NumberAnimation { duration: IslandMotion.standard; easing.type: Easing.OutBack  } }
 
-        // Tooltip floats above (outside item bounds, z:20)
         Rectangle {
             y: -(height + 8); z: 20
             anchors.horizontalCenter: parent.horizontalCenter
@@ -499,7 +465,6 @@ PanelWindow {
                 sourceSize: Qt.size(root.iconSize * 2, root.iconSize * 2)
             }
 
-            // Fallback letter tile when image not loaded
             Rectangle {
                 anchors.fill: parent; anchors.margins: 4
                 visible: !iconImg.visible; radius: 10
@@ -513,7 +478,6 @@ PanelWindow {
                 }
             }
 
-            // Running dot — 4 px below icon
             Rectangle {
                 visible: appBtn.isRunning
                 width: 4; height: 4; radius: 2; color: "white"; opacity: 0.85
@@ -536,10 +500,6 @@ PanelWindow {
         }
     }
 
-    // Hover zone over the visible pill — must be a SIBLING of pill, not a child,
-    // because Translate only moves rendering; child MouseAreas stay at layout coords.
-    // Tracks pill's visual position: pill.y (layout) + pill.slideY (Translate offset)
-    // + the pillH band at the bottom of the pill item.
     MouseArea {
         x:      pill.x
         y:      pill.y + pill.slideY + (pill.height - root.pillH)
@@ -551,9 +511,6 @@ PanelWindow {
         z: -1
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // ── Pill ─────────────────────────────────────────────────────────
-    // ═══════════════════════════════════════════════════════════════════
     Item {
         id: pill
         anchors.horizontalCenter: parent.horizontalCenter
@@ -562,17 +519,15 @@ PanelWindow {
 
         width:          pillRow.implicitWidth + root.edgePad * 2
         implicitWidth:  width
-        height:         root.pillH + 20   // +20 for tooltip headroom above
+        height:         root.pillH + 20   
         implicitHeight: height
 
-        // slideY: 0 when visible, positive = slid off bottom
         property real slideY: root.pillActuallyVisible ? 0 : (root.pillH + 30)
         transform: Translate { y: pill.slideY }
         Behavior on slideY {
             NumberAnimation { duration: IslandMotion.standard; easing.type: IslandMotion.easeArrive }
         }
 
-        // Pill background sits in the lower pillH band
         Rectangle {
             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
             height: root.pillH; radius: height / 2
@@ -582,7 +537,6 @@ PanelWindow {
             Behavior on color { ColorAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeMove } }
         }
 
-        // Content row — centred in pillH, shifted up 4px for running dot room
         Row {
             id: pillRow
             anchors.horizontalCenter: parent.horizontalCenter
@@ -590,7 +544,6 @@ PanelWindow {
             anchors.bottomMargin:     (root.pillH - root.iconSize) / 2 + 4
             spacing: root.iconGap
 
-            // ── Favourites ─────────────────────────────────────────────
             Repeater {
                 model: root.favApps
                 delegate: AppButton {
@@ -628,7 +581,6 @@ PanelWindow {
 
             DockDivider { visible: root.favApps.length > 0 && root.activeApps.length > 0 }
 
-            // ── Active non-favourite windows (ALL windows, not one per class) ──
             Repeater {
                 model: root.activeApps
                 delegate: AppButton {
@@ -647,7 +599,6 @@ PanelWindow {
 
             DockDivider {}
 
-            // ── Systray slide-in ───────────────────────────────────────
             Row {
                 id: trayIconsRow
                 spacing: root.iconGap
@@ -798,7 +749,6 @@ PanelWindow {
                 }
             }
 
-            // ── Chevron ›/‹ ───────────────────────────────────────────
             Item {
                 width: root.iconSize; height: root.iconSize
                 anchors.verticalCenter: parent.verticalCenter
@@ -823,6 +773,5 @@ PanelWindow {
             }
         }
     }
-
 
 }

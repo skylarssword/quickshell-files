@@ -3,9 +3,6 @@ import Quickshell
 import IslandBackend
 import "../shared"
 
-// ── Cog button inside the sidebar pill ───────────────────────────────────────
-// Sits below the notification bell. Opens/closes SidebarControlCenterLayer.
-
 Item {
     id: root
 

@@ -5,7 +5,6 @@ import IslandBackend
 import QtQuick.Controls
 import "../shared"
  
-
 Item {
     id: controlCenter
 
@@ -23,7 +22,7 @@ signal pinToggleRequested()
     property bool pinned: false
 signal bubblesToggleRequested()
     property bool bubblesEnabled: true
-    // ── Dock ──────────────────────────────────────────────────────────
+    
     signal dockEnabledToggleRequested()
     property bool   dockEnabled: true
     signal dockModeChangeRequested(string mode)
@@ -32,8 +31,7 @@ signal bubblesToggleRequested()
     property bool idleMode: false
     signal sidebarToggleRequested()
     property bool sidebarEnabled: false
-    // Tracks which mode was last selected so the master toggle knows what to restore.
-    // "bar" = WorkspaceBubble+Systray, "dock" = BubbleDockWindow pill
+    
     property string lastBubbleMode: "bar"
     property bool appearanceMenuOpen: false
     property bool gamemodeCardFlipped: false
@@ -53,7 +51,6 @@ signal bubblesToggleRequested()
     property string textFontFamily: userConfig.textFontFamily
     property string heroFontFamily: userConfig.heroFontFamily
    
-
     scale: showCondition ? 1.0 : 0.12
     transformOrigin: Item.Top
 
@@ -219,10 +216,8 @@ readonly property real controlCenterExtraHeight: powerMenuOpen
         : (12 + batteryDrawerHandleHeight
             + batteryDrawerContentGap + batteryModeCardHeight)
 
-// Power menu height: header (28) + spacing (12) + button column (44+16) + margins (24)
    readonly property real powerMenuTotalHeight: 150
-   // Bound directly to the Column's real measured height (id: controlCenterColumn, added
-   // below) rather than a hand-computed constant — avoids the off-by-N clipping bug.
+   
    readonly property real notificationPanelTotalHeight: controlCenterColumn.implicitHeight + 24
     readonly property bool bluetoothAvailable: !!bluetoothAdapter
     readonly property var bluetoothAdapter: Bluetooth.defaultAdapter
@@ -318,8 +313,6 @@ function toggleBatteryDrawer() {
             refreshBatteryModeState();
     }
 
-    // Reset to the front face once the drawer fully closes, so it doesn't
-    // silently reopen already flipped to Battery next time.
     onBatteryDrawerOpenChanged: if (!batteryDrawerOpen) gamemodeCardFlipped = false
 
     function refreshBatteryModeState() {
@@ -1066,16 +1059,11 @@ Process {
         }
     }
 
-
-    // ── Hyprsunset Executive Toggler ───────────────────────────────────────
     Process {
         id: hyprsunsetExec
-        // Fix: Use separate array indexing for shell arguments to prevent multi-word parsing faults
+        
         command: ["bash", "-c", "pgrep -x hyprsunset > /dev/null && pkill -x hyprsunset || hyprsunset --temperature 4500 &"]
     }
-
-
-
 
     Process {
         id: hyprsunsetChecker
@@ -1088,16 +1076,14 @@ Process {
         }
     }
 
-    // ── Auto-Sync Timer Loop ───────────────────────────────────────────────
     Timer {
         id: hyprsunsetTimer
-        interval: 2500       // Check every 2.5 seconds
-        running: true        // Starts checking automatically on launch
-        repeat: true         // Keep looping indefinitely
-        triggeredOnStart: true // Runs once the exact millisecond the bar loads!
+        interval: 2500       
+        running: true        
+        repeat: true         
+        triggeredOnStart: true 
         onTriggered: hyprsunsetChecker.run()
     }
-
 
     Process {
         id: screenshotExec
@@ -1364,7 +1350,6 @@ Text {
                     }
                 }
 
-                // ── Hyprsunset button ──────────────────────────────────────
                 Rectangle {
                     id: hyprsunsetBtn
                     width: 26
@@ -1399,13 +1384,11 @@ Text {
                         anchors.fill: parent
                         hoverEnabled: true
                         onClicked: {
-                            // 1. Instantly flip the UI color state without waiting
+                            
                             controlCenter.hyprsunsetActive = !controlCenter.hyprsunsetActive;
                             
-                            // 2. Fire the system background toggle
                             hyprsunsetExec.startDetached();
                             
-                            // 3. Double-check system state after 300ms just to be certain
                             var t = _delayedCheckTimer;
                             if (!t) {
                                 t = Qt.createQmlObject('import QtQuick; Timer { interval: 300; onTriggered: hyprsunsetChecker.run() }', sunsetBtnMouse);
@@ -1414,10 +1397,8 @@ Text {
                         }
                     }
 
-
                 }
 
-// ── Appearance (capsule opacity / pywal color) button ───────
                 Rectangle {
                     id: appearanceBtn
                     width: 26
@@ -1763,7 +1744,6 @@ Item {
                 + controlCenter.batteryDrawerProgress * openDistance
             clip: true
 
-// ── LEFT: Gamemode / Battery card (flippable) ───────────────────
 Rectangle {
                 id: gamemodeCard
                 anchors.left: parent.left
@@ -1777,9 +1757,6 @@ Rectangle {
                 opacity: Math.min(1, controlCenter.batteryDrawerProgress * 1.35)
                 clip: true
 
-                // Which face is actually drawn — flipped mid-animation
-                // (at the 90° squash point) rather than the instant the
-                // button is pressed, so the swap lines up with the visual.
                 property bool showBackFace: false
 
                 transform: Rotation {
@@ -1818,7 +1795,6 @@ Rectangle {
                     }
                 }
 
-                // ── Front face: Game Mode ────────────────────────────────
                 Item {
                     id: gamemodeFrontFace
                     anchors.fill: parent
@@ -1861,8 +1837,6 @@ Rectangle {
                         }
                     }
 
-                    // Bottom row — whole row is clickable to flip, same
-                    // pattern as wifiDetailButton / bluetoothDetailButton.
                     Item {
                         id: gamemodeFrontDetailButton
                         anchors.left: parent.left
@@ -1920,18 +1894,11 @@ Rectangle {
                     }
                 }
 
-// ── Back face: Battery / TLP power plan (OG carousel) ────
                 Item {
                     id: gamemodeBackFace
                     anchors.fill: parent
                     visible: gamemodeCard.showBackFace
 
-                    // Counter-rotates this face by a fixed 180°. Combined with
-                    // gamemodeCard's own 0→180° sweep, this cancels the mirroring
-                    // that would otherwise happen — a plane rotated 180° around Y
-                    // shows its content backwards, since you're looking at what
-                    // would be "the other side of the glass." This keeps text
-                    // and layout reading normally once the card settles at 180°.
                     transform: Rotation {
                         origin.x: gamemodeCard.width / 2
                         origin.y: gamemodeCard.height / 2
@@ -1939,8 +1906,6 @@ Rectangle {
                         angle: 180
                     }
 
-                    // Whole top row is clickable to flip back — same pattern
-                    // as the front face's bottom detail row.
                     Item {
                         id: gamemodeBackDetailButton
                         anchors.left: parent.left
@@ -2119,7 +2084,6 @@ Rectangle {
                 }
             }
 
-// ── RIGHT: Screenshot card ─────────────────────────────────────
 	Rectangle {
                 id: screenshotCard
                 anchors.right: parent.right
@@ -2133,7 +2097,6 @@ Rectangle {
                 opacity: Math.min(1, controlCenter.batteryDrawerProgress * 1.35)
                 clip: true
 
-               // Camera icon top-left
                 Text {
                     renderType: Text.NativeRendering
                     anchors.left: parent.left
@@ -2149,7 +2112,6 @@ Rectangle {
                     Behavior on color { ColorAnimation { duration: 150 } }
                 }
 
-                // Toggle button top-right — matches wifi/bluetooth switch size
                 Rectangle {
                     id: captureBtn
                     anchors.right: parent.right
@@ -2179,7 +2141,6 @@ Rectangle {
                     }
                 }
 
-// Bottom row — label + hint, matches gamemode card style
                 Item {
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -2308,7 +2269,6 @@ Rectangle {
             }
         }
 
-     // ── Power menu (inline, decoupled) ─────────────────────────────────
         Item {
             id: powerMenuDrawer
             width: parent.width
@@ -2407,7 +2367,6 @@ Text {
             }
         }
 
-// ── Idle settings (separate bubble, tied to power menu) ─────────────
         Item {
             id: idleSettingsPanel
             width: parent.width
@@ -2625,7 +2584,6 @@ ComboBox {
             }
         }
 
-// ── Notification history (inline, decoupled) ───────────────────────
         Item {
             id: notificationPanelDrawer
             width: parent.width
@@ -2901,7 +2859,6 @@ Item {
             }
         }
 
-// ── Appearance (opacity / pywal color) drawer, inline & decoupled ──
         Item {
             id: appearanceMenuDrawer
             width: parent.width
@@ -3068,7 +3025,6 @@ Rectangle {
                         }
                     }
 
-// ── Pywal color swatches — only shown while Pywal is on ──
                     Item {
                         id: walSwatchRow
                         width: parent.width
@@ -3087,8 +3043,6 @@ Rectangle {
                             boundsBehavior: Flickable.StopAtBounds
                             model: controlCenter.capsuleWalColors.length
 
-                            // Center the row when it's narrower than the viewport,
-                            // left-align (normal scroll) once it overflows.
                             readonly property real contentNaturalWidth: count > 0
                                 ? (count * 26 + Math.max(0, count - 1) * spacing)
                                 : 0
@@ -3185,8 +3139,6 @@ Rectangle {
             }
         }
 
-
-// ── Dock settings drawer ─────────────────────────────────────────────
         Item {
             id: dockSettingsDrawer
             width: parent.width
@@ -3216,10 +3168,6 @@ Rectangle {
                     anchors.margins: 14
                     spacing: 10
 
-                    // ── Header: "Bubble" label + on/off master toggle ────
-                    // The master toggle controls BOTH bar (WorkspaceBubble + SystrayBubble)
-                    // AND the dock pill. Turning it off disables everything.
-                    // Turning it on re-enables whichever mode (Bar or Dock) was selected.
                     Item {
                         width: parent.width
                         height: 24
@@ -3243,7 +3191,7 @@ Rectangle {
                             Text {
                                 renderType:          Text.NativeRendering
                                 anchors.verticalCenter: parent.verticalCenter
-                                // "on" if either bar or dock is enabled
+                                
                                 text:  (controlCenter.bubblesEnabled || controlCenter.dockEnabled) ? "On" : "Off"
                                 color: controlCenter.textSecondary
                                 font.pixelSize: 10
@@ -3254,7 +3202,7 @@ Rectangle {
                             Rectangle {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 34; height: 20; radius: 10
-                                // Active if either bar bubbles or dock pill is on
+                                
                                 readonly property bool anyEnabled: controlCenter.bubblesEnabled || controlCenter.dockEnabled
                                 color: anyEnabled ? StyleTokens.success : StyleTokens.switchOff
                                 Behavior on color { ColorAnimation { duration: StyleTokens.durationFast } }
@@ -3271,7 +3219,7 @@ Rectangle {
                                     onClicked: {
                                         const anyOn = controlCenter.bubblesEnabled || controlCenter.dockEnabled
                                         if (anyOn) {
-                                            // Turn OFF everything — remember which mode was on
+                                            
                                             if (controlCenter.bubblesEnabled) {
                                                 controlCenter.lastBubbleMode = "bar"
                                                 controlCenter.bubblesToggleRequested()
@@ -3281,13 +3229,13 @@ Rectangle {
                                                 controlCenter.dockEnabledToggleRequested()
                                             }
                                         } else {
-                                            // Turn ON: restore last selected mode
+                                            
                                             if (controlCenter.lastBubbleMode === "dock") {
                                                 controlCenter.dockEnabledToggleRequested()
                                                 if (controlCenter.bubblesEnabled)
                                                     controlCenter.bubblesToggleRequested()
                                             } else {
-                                                // default: restore bar
+                                                
                                                 controlCenter.bubblesToggleRequested()
                                                 if (controlCenter.dockEnabled)
                                                     controlCenter.dockEnabledToggleRequested()
@@ -3299,18 +3247,12 @@ Rectangle {
                         }
                     }
 
-                    // ── Mode grid: [Bar | Dock] then [Pin | Smart] when Dock active ──
-                    // Bar  = WorkspaceBubble + SystrayBubble only (dockEnabled=false, bubblesEnabled=true)
-                    // Dock = BubbleDockWindow pill only          (dockEnabled=true,  bubblesEnabled=false)
-                    // These are mutually exclusive. Enabling Bar removes Dock and vice-versa.
                     Grid {
                         width: parent.width
                         columns: 2
                         rowSpacing:    6
                         columnSpacing: 6
 
-                        // ── Bar bubble ────────────────────────────────────
-                        // Active when bubblesEnabled=true (independent of dock)
                         Rectangle {
                             width:  (parent.width - 6) / 2
                             height: 36
@@ -3341,14 +3283,12 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape:  Qt.PointingHandCursor
                                 onClicked: {
-                                    // Toggle bar bubbles independently — does not affect dock
+                                    
                                     controlCenter.bubblesToggleRequested()
                                 }
                             }
                         }
 
-                        // ── Dock bubble ───────────────────────────────────
-                        // Active when dockEnabled=true (independent of bar)
                         Rectangle {
                             width:  (parent.width - 6) / 2
                             height: 36
@@ -3379,13 +3319,12 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape:  Qt.PointingHandCursor
                                 onClicked: {
-                                    // Toggle dock independently — does not affect bar bubbles
+                                    
                                     controlCenter.dockEnabledToggleRequested()
                                 }
                             }
                         }
 
-                        // ── Pin bubble — only shown when Dock is the active mode ──
                         Rectangle {
                             width:   (parent.width - 6) / 2
                             height:  controlCenter.dockEnabled ? 36 : 0
@@ -3423,7 +3362,6 @@ Rectangle {
                             }
                         }
 
-                        // ── Smart bubble — only shown when Dock is the active mode ──
                         Rectangle {
                             width:   (parent.width - 6) / 2
                             height:  controlCenter.dockEnabled ? 36 : 0
@@ -3465,7 +3403,6 @@ Rectangle {
             }
         }
 
-// ── Island Settings drawer ─────────────────────────────────────────
         Item {
             id: islandSettingsDrawer
             width: parent.width
@@ -3572,7 +3509,6 @@ MouseArea {
                         opacity: 0.7
                     }
 
-                    // ── Sidebar ───────────────────────────────────────────
                     Item {
                         width: parent.width
                         height: 24

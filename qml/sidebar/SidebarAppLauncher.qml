@@ -7,16 +7,9 @@ import IslandBackend
 import "../shared"
 import "../island"
 
-// ── Centered app launcher popup ──────────────────────────────────────────────
-// Behaves identically to the main island's SearchPillLayer, but lives in its
-// own PanelWindow so it floats center-screen independent of the island capsule.
-// The window covers the full screen (like WallpaperPickerWindow) but only
-// receives input over the capsule via mask + keyboardFocus.
-
 PanelWindow {
     id: root
 
-    // ── Pywal / capsule color wiring ─────────────────────────────────
     property bool   gamemodeActive:    false
     property bool   useWalColor:       false
     property color  walColor:          "#000000"
@@ -28,18 +21,15 @@ PanelWindow {
             ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue)
             : Qt.rgba(0, 0, 0, capsuleOpacityValue))
 
-    // ── Font props forwarded from SidebarWindow ───────────────────────
     property string iconFontFamily: UserConfig.iconFontFamily
     property string textFontFamily: UserConfig.textFontFamily
 
-    // ── Open/close ────────────────────────────────────────────────────
     property bool launcherOpen: false
 
     function open()  { launcherOpen = true  }
     function close() { launcherOpen = false }
     function toggle(){ launcherOpen = !launcherOpen }
 
-    // ── Window setup ─────────────────────────────────────────────────
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     aboveWindows: true
@@ -49,7 +39,6 @@ PanelWindow {
     focusable: launcherOpen
     visible: launcherOpen
 
-    // ── Input mask: only the capsule catches mouse/keyboard ───────────
     mask: Region {
         Region {
             x: Math.floor(capsule.x)
@@ -59,7 +48,6 @@ PanelWindow {
         }
     }
 
-    // ── Click-outside-to-close backdrop ──────────────────────────────
     MouseArea {
         anchors.fill: parent
         enabled: root.launcherOpen
@@ -69,7 +57,6 @@ PanelWindow {
 
     Keys.onEscapePressed: root.close()
 
-    // ── App launcher process (same pattern as DynamicIslandWindow) ───
     QtObject {
         id: launchExec
 
@@ -88,9 +75,6 @@ PanelWindow {
         }
     }
 
-    // ── Capsule ───────────────────────────────────────────────────────
-    // Sized by SearchPillLayer's own capsuleWidth / capsuleHeight, same
-    // as the main island does. Centred on the screen.
     Item {
         id: capsule
         width:  searchContent.capsuleWidth
@@ -103,7 +87,6 @@ PanelWindow {
         Behavior on scale   { NumberAnimation { duration: IslandMotion.durationMedium; easing.type: IslandMotion.easeMove } }
         clip: true
 
-        // Mugen-style outlined pill background
         Rectangle {
             anchors.fill: parent
             radius: 28
@@ -113,7 +96,6 @@ PanelWindow {
             clip: true
         }
 
-        // ── SearchPillLayer (identical component, different container) ─
         SearchPillLayer {
             id: searchContent
             anchors.fill: parent
@@ -128,7 +110,6 @@ PanelWindow {
                 root.close()
             }
 
-            // Pass capsule dimensions up so the window mask never clips content
             onCapsuleWidthChanged:  capsule.width  = capsuleWidth
             onCapsuleHeightChanged: capsule.height = capsuleHeight
         }

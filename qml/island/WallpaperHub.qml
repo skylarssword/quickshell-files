@@ -6,9 +6,6 @@ import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import "../shared"
 
-// Folder, awww flags, post-command, and thumb cache all match waypaper config.
-// it now lives directly inside the parent search capsule (no nested box).
-
 Item {
     id: root
 
@@ -24,21 +21,20 @@ Item {
     readonly property int headerHeight: 40
     readonly property int footerHeight: 36
     readonly property int gridRowCount: 2
-    readonly property int thumbCellSize: 64   // smaller thumbs, matches app-grid icon cell size
+    readonly property int thumbCellSize: 64   
     readonly property int gridCols: Math.max(4, Math.floor((760 - 20) / thumbCellSize))
     readonly property int gridHeight: (thumbCellSize * gridRowCount) + 6
     readonly property int capsuleHeight: viewMode === "quick"
         ? quickHeaderHeight + quickCarouselHeight + quickFooterHeight
         : (headerHeight + gridHeight + footerHeight)
 
-    // ── View mode: "quick" (carousel) or "grid" (existing full grid) ────
     property string viewMode: "quick"
-    readonly property int quickCapsuleWidth: 680     // was 620 — more room for the larger carousel below
-    readonly property int quickHeaderHeight: 48   // was 40
-    readonly property int quickCarouselHeight: 250   // was 220
-    readonly property int quickFooterHeight: 36   // was 30
-    readonly property int quickCellWidth: 380        // was 340
-    readonly property int quickCellHeight: 168        // was 150 (keeps the same ~2.27:1 aspect ratio)
+    readonly property int quickCapsuleWidth: 680     
+    readonly property int quickHeaderHeight: 48   
+    readonly property int quickCarouselHeight: 250   
+    readonly property int quickFooterHeight: 36   
+    readonly property int quickCellWidth: 380        
+    readonly property int quickCellHeight: 168        
     readonly property int quickSkew: 26
     readonly property real quickNeighborScale: 0.74
 
@@ -53,7 +49,6 @@ Item {
 
     signal closeRequested()
 
-    // ── Config — paths from IslandConfiguration singleton ────────────────
     readonly property string wallpaperFolder: IslandConfiguration.wallpaperFolder
     readonly property string thumbCacheDir:   IslandConfiguration.thumbCacheDir
     readonly property string postCommand:     IslandConfiguration.postCommand
@@ -65,8 +60,7 @@ Item {
         "--transition-duration 2 " +
         "--transition-fps 60"
 
-    // ── State ─────────────────────────────────────────────────────────────
-    property int    activeTab:        0    // 0 = static, 1 = video
+    property int    activeTab:        0    
     property var    staticWalls:      []
     property var    videoWalls:       []
     property string searchText:       ""
@@ -91,7 +85,6 @@ Item {
     }
     property var activeList: activeTab === 0 ? filteredStatic : filteredVideo
 
-    // ── Boot ─────────────────────────────────────────────────────────────
     Component.onCompleted: {
         staticScanner.running = true
         videoScanner.running  = true
@@ -158,7 +151,6 @@ Item {
         }
     }
 
-    // ── Thumbnail path resolver ───────────────────────────────────────────
     property var thumbMap: ({})
 
     Process {
@@ -245,7 +237,6 @@ Item {
 
     onStaticWallsChanged: Qt.callLater(rebuildThumbMap)
 
-    // ── Setters ───────────────────────────────────────────────────────────
     Process {
         id: awwwProc
         onRunningChanged: {
@@ -363,16 +354,12 @@ Item {
         openFolderProc.running = true
     }
 
-    // ── UI ────────────────────────────────────────────────────────────────
-    // UI — renders inside parent capsule, no own background
-
     Column {
         id: gridModeColumn
         anchors.fill: parent
         spacing: 0
         visible: root.viewMode === "grid"
 
-        // ── Header: own search box + tabs ───────────────────────────────
         Item {
             id: topBar
             width: parent.width
@@ -468,7 +455,6 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 4
 
-                // ── Toggle back to Quickview carousel ───────────────────────
                 Rectangle {
                     width: 26; height: 26; radius: 13
                     anchors.verticalCenter: parent.verticalCenter
@@ -478,7 +464,7 @@ Item {
                     Text {
                         renderType: Text.NativeRendering
                         anchors.centerIn: parent
-                        text: "\uf066"   // collapse/compress-style icon
+                        text: "\uf066"   
                         color: "white"
                         opacity: toQuickMouse.containsMouse ? 0.9 : 0.5
                         font.family: root.iconFontFamily
@@ -528,7 +514,6 @@ Item {
             }
         }
 
-        // ── Grid ──────────────────────────────────────────────────────────
         Item {
             id: gridArea
             width: parent.width
@@ -738,7 +723,6 @@ Item {
             }
         }
 
-        // ── Footer ────────────────────────────────────────────────────────
         Rectangle {
             id: bottomBar
             width: parent.width
@@ -876,16 +860,14 @@ Item {
                 visible: root.statusMessage === ""
             }
         }
-    } // Closes gridModeColumn
+    } 
 
-    // ── Quickview: carousel, one large item centered, neighbors peeking ──
     Column {
         id: quickModeColumn
         anchors.fill: parent
         spacing: 0
         visible: root.viewMode === "quick"
 
-        // ── Header: Picture/Video toggle (shared activeTab) + expand icon ─
         Item {
             id: quickTopBar
             width: parent.width
@@ -932,7 +914,6 @@ Item {
                 }
             }
 
-            // ── Expand to full grid ─────────────────────────────────────────
             Rectangle {
                 anchors.right: parent.right
                 anchors.rightMargin: 10
@@ -944,7 +925,7 @@ Item {
                 Text {
                     renderType: Text.NativeRendering
                     anchors.centerIn: parent
-                    text: "\uf065"   // expand-style icon
+                    text: "\uf065"   
                     color: "white"
                     opacity: toGridMouse.containsMouse ? 0.9 : 0.5
                     font.family: root.iconFontFamily
@@ -957,7 +938,6 @@ Item {
             }
         }
 
-        // ── Carousel ──────────────────────────────────────────────────────
         Item {
             id: quickCarouselArea
             width: parent.width
@@ -1019,9 +999,6 @@ Item {
                 Keys.onRightPressed: if (currentIndex < count - 1) currentIndex++
                 Keys.onTabPressed: root.activeTab = root.activeTab === 0 ? 1 : 0
 
-                // Any other printable character means "I want to search" —
-                // expand to the full grid and forward the keystroke into its
-                // search box, matching the "typing expands" behavior.
                 Keys.onPressed: (event) => {
                     if (event.text && event.text.length > 0 && /[ -~]/.test(event.text)) {
                         root.viewMode = "grid"
@@ -1077,8 +1054,6 @@ Item {
                         Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                         Behavior on opacity { NumberAnimation { duration: 220 } }
 
-                        // ── Parallelogram mask: top/bottom stay horizontal,
-                        // left/right edges slant by root.quickSkew pixels ──
                         Canvas {
                             id: quickParallelogramMask
                             anchors.fill: parent
@@ -1172,8 +1147,6 @@ Item {
                             }
                         }
 
-                        // Thin hairline outline on the parallelogram card itself,
-                        // matching the shell's border language elsewhere.
 Canvas {
                             id: quickHairline
                             anchors.fill: parent
@@ -1196,8 +1169,6 @@ Canvas {
                             Component.onCompleted: requestPaint()
                         }
 
-                        // ── Slanted outline drawn on top, since border.width
-                        // on a Rectangle can't follow a parallelogram path ──
                         Canvas {
                             id: quickOutline
                             anchors.fill: parent
@@ -1243,7 +1214,6 @@ Canvas {
             }
         }
 
-        // ── Footer hint ─────────────────────────────────────────────────────
         Item {
             width: parent.width
             height: root.quickFooterHeight
@@ -1260,5 +1230,5 @@ Canvas {
                 font.pixelSize: 9; font.family: root.textFontFamily
             }
         }
-    } // Closes quickModeColumn
+    } 
     }

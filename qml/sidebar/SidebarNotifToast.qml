@@ -4,18 +4,12 @@ import Quickshell.Wayland
 import IslandBackend
 import "../shared"
 
-// ── Sidebar-state notification toast ─────────────────────────────────────────
-// Slides in from the top of the screen, centered horizontally.
-// Only fires when sidebarEnabled && !dndActive.
-// Called via showToast(appName, summary) from SidebarWindow.
-
 PanelWindow {
     id: root
 
     property string textFontFamily: ""
     property string iconFontFamily: ""
 
-    // Pywal / gamemode color props passed from SidebarWindow
     property bool  useWalColor:         false
     property color walColor:            "#000000"
     property real  capsuleOpacityValue: 0.20
@@ -45,7 +39,7 @@ PanelWindow {
     }
 
     function updateIcon(appName, iconPath) {
-        // If toast is still visible for this app, update the icon live
+        
         if (_visible && _appName === appName)
             _appIcon = iconPath
     }
@@ -77,13 +71,11 @@ PanelWindow {
         height: Math.ceil(toast.height)
     }
 
-    // ── Toast card — centered at top ──────────────────────────────────
     Item {
         id: toast
         width:  root.toastW
         height: root.toastH
 
-        // Centered horizontally, near top
         anchors.horizontalCenter: parent.horizontalCenter
         y: root._visible ? 12 : -root.toastH - 4
 
@@ -116,7 +108,6 @@ PanelWindow {
             anchors.topMargin: 10; anchors.bottomMargin: 10
             spacing: 12
 
-            // App icon (falls back to bell glyph)
             Item {
                 width: 26; height: 26
                 anchors.verticalCenter: parent.verticalCenter

@@ -62,13 +62,11 @@ Timer {
         }
     }
 
-//player
    function visualizerLevel(index) {
     if (cavaLevels && cavaLevels.length > 0 && isPlaying) {
         const idx = Math.floor(index * cavaLevels.length / 6)
         const v = cavaLevels[idx] || 0
 
-        // stronger response curve (fixes “too slow / too flat”)
         return Math.min(1.0, Math.pow(v, 1.4) * 1.2)
     }
 
@@ -79,7 +77,6 @@ Timer {
     return 0.05 + primary * 0.35 + secondary * 0.2
 }
 
-//paused player
     function pausedVisualizerLevel(index) {
         const levels = [0.34, 0.58, 0.82, 0.82, 0.58, 0.34]
         return levels[index] || 0.4
@@ -123,9 +120,6 @@ Column {
         anchors.fill: parent
         spacing: 14
 
-        // ── Workspace indicator — fixed-height slot so the layout never
-        // jumps between tracks/players; present but blank when no match
-        // is found for the active player's window.
         Item {
             width: parent.width
             height: 7
@@ -149,7 +143,6 @@ Column {
             }
         }
 
-        // ── Row 1: Album art + track info + cava ──
         Item {
             width: parent.width
             height: 60
@@ -187,7 +180,6 @@ Column {
                         maskSource: expandedArtMask
                     }
 
-                    // Circular hairline outline, shares the shell's border tokens
                     Rectangle {
                         anchors.fill: parent
                         radius: width / 2
@@ -270,7 +262,6 @@ Column {
             }
         }
 
-        // ── Row 2: Progress bar ──
         Item {
             width: parent.width
             height: 16
@@ -342,7 +333,6 @@ Rectangle {
             }
         }
 
-        // ── Row 3: Controls ──
         Item {
             width: parent.width
             height: 36
@@ -351,7 +341,6 @@ Rectangle {
                 anchors.centerIn: parent
                 spacing: 28
 
-                // Shuffle
                 Item {
                     width: 24
                     height: 24
@@ -406,7 +395,6 @@ Rectangle {
                     }
                 }
 
-                // Previous
                 Item {
                     width: 28
                     height: 28
@@ -443,7 +431,6 @@ Rectangle {
                     }
                 }
 
-                // Play/Pause
                 Item {
                     width: 28
                     height: 28
@@ -485,7 +472,6 @@ Rectangle {
                     }
                 }
 
-                // Next
                 Item {
                     width: 28
                     height: 28
@@ -522,7 +508,6 @@ Rectangle {
                     }
                 }
 
-// ── Loop ──
     Item {
         width: 24
         height: 24
@@ -582,12 +567,12 @@ Rectangle {
                 activePlayer.loopState = next
             }
         }
-    } // Closes Loop Item
+    } 
 
-        } // Closes Row (FIXED)
-    } // Closes Row 3 Item (FIXED)
-} // Closes parent Column (FIXED)
+        } 
+    } 
+} 
 
     Process { id: loopProc }
     Process { id: shuffleProc }
-} // Closes root Item
+} 

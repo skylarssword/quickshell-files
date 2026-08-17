@@ -2,12 +2,6 @@ import QtQuick
 import IslandBackend
 import "../shared"
 
-// ── Stacked bold clock inside the sidebar pill ────────────────────────────────
-// Shows:   02      (hour, large, bold)
-//          26      (minute, large, bold)
-//          PM      (AM/PM, small, muted)
-// Clicking opens SidebarInfoPopup.
-
 Item {
     id: root
 
@@ -16,7 +10,6 @@ Item {
     property bool   isOpen:        false
     signal toggled()
 
-    // Time is read from IslandClock if available, otherwise a JS timer
     property string _hour:   "12"
     property string _minute: "00"
     property string _ampm:   "AM"

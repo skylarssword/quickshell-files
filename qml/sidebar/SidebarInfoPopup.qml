@@ -6,17 +6,12 @@ import Quickshell.Io
 import IslandBackend
 import "../shared"
 
-// ── Centered weather + calendar popup ────────────────────────────────────────
-// Self-contained: has its own curl processes, same API calls as InfoLayer tab 0.
-// Layout: weather on left, vertical divider, calendar on right.
-
 PanelWindow {
     id: root
 
     property string textFontFamily: ""
     property string iconFontFamily: ""
 
-    // ── Theming ───────────────────────────────────────────────────────
     property bool   gamemodeActive:      false
     property bool   useWalColor:         false
     property color  walColor:            "#000000"
@@ -34,7 +29,6 @@ PanelWindow {
     function toggle(){ if (popupOpen) close(); else open() }
     property bool _loaded: false
 
-    // ── Weather state ─────────────────────────────────────────────────
     property real   tempF:       0
     property string weatherDesc: ""
     property int    weatherCode: -1
@@ -52,7 +46,6 @@ PanelWindow {
     property var    forecastPrecip: []
     property string citySearch:  ""
 
-    // ── Calendar state ────────────────────────────────────────────────
     property int calMonth: new Date().getMonth()
     property int calYear:  new Date().getFullYear()
     property int todayD:   new Date().getDate()
@@ -84,7 +77,6 @@ PanelWindow {
 
     Component.onCompleted: updateCalendar(calYear, calMonth)
 
-    // ── Weather WMO helpers (copy from InfoLayer) ─────────────────────
     function wmoIcon(code, day) {
         if (code === 0)                    return day ? "☀️"  : "🌙"
         if (code <= 2)                     return day ? "🌤️"  : "🌤️"
@@ -115,7 +107,6 @@ PanelWindow {
         return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]
     }
 
-    // ── Fetch processes ────────────────────────────────────────────────
     Process {
         id: ipGeoProc
         command: ["curl","-sf","--max-time","5","http://ip-api.com/json/?fields=city,lat,lon,status"]
@@ -198,7 +189,6 @@ PanelWindow {
         }
     }
 
-    // ── Window setup ──────────────────────────────────────────────────
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     aboveWindows: true
@@ -223,7 +213,6 @@ PanelWindow {
     }
     Keys.onEscapePressed: root.close()
 
-    // ── Card ──────────────────────────────────────────────────────────
     Item {
         id: card
         width: root.cardW; height: root.cardH
@@ -248,7 +237,6 @@ PanelWindow {
             anchors.topMargin: 20
             spacing: 20
 
-            // ── LEFT: Weather ─────────────────────────────────────────
             Item {
                 width: parent.width * 0.44
                 height: parent.height
@@ -257,7 +245,6 @@ PanelWindow {
                     anchors.fill: parent
                     spacing: 6
 
-                    // City + refresh
                     Row {
                         width: parent.width; spacing: 6
                         Text {
@@ -283,7 +270,6 @@ PanelWindow {
                         }
                     }
 
-                    // Search bar
                     Rectangle {
                         width: parent.width; height: 22; radius: 11
                         color: Qt.rgba(1,1,1,0.08)
@@ -304,7 +290,6 @@ PanelWindow {
                         }
                     }
 
-                    // Big temp + icon
                     Row {
                         width: parent.width; spacing: 8
                         visible: root.weatherCode !== -1 && !root.wxLoading
@@ -329,7 +314,6 @@ PanelWindow {
                         }
                     }
 
-                    // Stats
                     Row {
                         width: parent.width; spacing: 10
                         visible: root.weatherCode !== -1 && !root.wxLoading
@@ -348,7 +332,6 @@ PanelWindow {
                         }
                     }
 
-                    // 5-day forecast
                     Column {
                         width: parent.width; spacing: 3
                         visible: root.forecastDates.length > 0 && !root.wxLoading
@@ -381,13 +364,11 @@ PanelWindow {
                 }
             }
 
-            // ── Divider ───────────────────────────────────────────────
             Rectangle {
                 width: 1; height: parent.height
                 color: Qt.rgba(1,1,1,0.12)
             }
 
-            // ── RIGHT: Calendar ───────────────────────────────────────
             Item {
                 width: parent.width - parent.width * 0.44 - 21
                 height: parent.height
@@ -395,7 +376,6 @@ PanelWindow {
                 Column {
                     anchors.fill: parent; spacing: 6
 
-                    // Month nav
                     Row {
                         width: parent.width
                         Text {
@@ -435,7 +415,6 @@ PanelWindow {
                         }
                     }
 
-                    // Day headers
                     Row {
                         width: parent.width
                         Repeater {
@@ -449,7 +428,6 @@ PanelWindow {
                         }
                     }
 
-                    // Calendar grid
                     Grid {
                         columns: 7; width: parent.width; spacing: 1
                         Repeater {

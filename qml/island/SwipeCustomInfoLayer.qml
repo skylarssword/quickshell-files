@@ -61,9 +61,6 @@ property var activePlayer: null
     property string currentArtUrl: ""
     readonly property bool hasActivePlayer: activePlayer !== null
 
-    // nowPlayingCluster now lives as an ordinary first child inside
-    // contentRow (below), so its width is automatically folded into
-    // contentRow.implicitWidth — no manual reservation needed.
     readonly property real preferredWidth: Math.max(
         minimumWidth,
         Math.min(Math.max(minimumWidth, maximumWidth), contentRow.implicitWidth + horizontalPadding * 2 + 28)
@@ -106,15 +103,12 @@ Row {
     opacity: clampedProgress
     spacing: groupSpacing
 
-    // ── Now-playing quick controls — first child, so it renders on
-    // the LEFT edge, ahead of the swipe-item Repeater.
     Row {
         id: nowPlayingCluster
         visible: root.hasActivePlayer
         height: parent.height
         spacing: 8
 
-        // Album art — Now the FIRST element, rendering on the leftmost side
         Item {
             width: 26; height: 26
             anchors.verticalCenter: parent.verticalCenter
@@ -148,7 +142,6 @@ Row {
             }
         }
 
-        // Previous
         Item {
             width: 28; height: 28
             anchors.verticalCenter: parent.verticalCenter
@@ -184,7 +177,6 @@ Row {
             }
         }
 
-        // Play/Pause
         Item {
             width: 28; height: 28
             anchors.verticalCenter: parent.verticalCenter
@@ -225,7 +217,6 @@ Row {
             }
         }
 
-        // Next
         Item {
             width: 28; height: 28
             anchors.verticalCenter: parent.verticalCenter
@@ -260,7 +251,7 @@ Row {
                 onClicked: if (root.activePlayer) root.activePlayer.next()
             }
         }
-    } // closes nowPlayingCluster
+    } 
 
     Repeater {
         model: root.items
@@ -384,11 +375,9 @@ Row {
                 font.letterSpacing: -0.15
                 wrapMode: Text.NoWrap
             }
-        } // closes delegate Item
-    } // closes Repeater
-} // closes contentRow
-
-
+        } 
+    } 
+} 
 
     RecordingIndicator {
         id: timeRecordingIndicator

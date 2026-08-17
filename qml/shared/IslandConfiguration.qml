@@ -2,8 +2,7 @@ pragma Singleton
 import QtQuick
 
 // ── tide-island user configuration ──────────────────────────────────────────
-// Edit this file once after installing. Everything else in the shell reads
-// from these properties — no other file should contain hardcoded paths.
+// Edit this file once after installing.
 //
 // Paths support ~ expansion via the shell; use absolute paths or $HOME-style
 // strings handled by your scripts. QML reads these as plain strings passed

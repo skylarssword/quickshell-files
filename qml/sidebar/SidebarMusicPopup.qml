@@ -40,10 +40,8 @@ PanelWindow {
     function close() { popupOpen = false }
     function toggle(){ popupOpen = !popupOpen }
 
-    // ── Flip state ────────────────────────────────────────────────────
     property bool showEqualizer: false
 
-    // Card dimensions — taller to fill space, wider for EQ
     readonly property real cardW: 400
     readonly property real cardH: 260
 
@@ -72,10 +70,8 @@ PanelWindow {
     }
     Keys.onEscapePressed: root.close()
 
-    // ── DBus processes for shuffle ────────────────────────────────────
     Process { id: shuffleProc }
 
-    // ── Window detection — "Playing in Spotify / YouTube Music" ──────
     property string mediaWindowLabel: ""
 
     Process {
@@ -111,13 +107,12 @@ PanelWindow {
                 const cls   = String(c.class  || "").toLowerCase()
                 const title = String(c.title  || "").toLowerCase()
 
-                // Spotify: native app, class = "spotify"
                 const isSpotify = cls.indexOf("spotify") >= 0
-                // ytm: runs in kitty terminal, title contains "ytm" — only when identity suggests ytm
+                
                 const isYtm = !isSpotify
                     && (identity.indexOf("youtube") >= 0 || identity.indexOf("ytm") >= 0)
                     && title.indexOf("ytm") >= 0
-                // Generic: match by identity vs class/title (skip short class names to avoid false positives)
+                
                 const isGeneric = !isSpotify && !isYtm
                     && cls.length > 3
                     && (cls.indexOf(identity) >= 0 || title.indexOf(identity) >= 0)
@@ -138,7 +133,6 @@ PanelWindow {
         root.mediaWindowLabel = ""
     }
 
-    // ── Card ──────────────────────────────────────────────────────────
     Item {
         id: card
         width:  root.cardW
@@ -150,7 +144,6 @@ PanelWindow {
         Behavior on opacity { NumberAnimation { duration: IslandMotion.durationMedium; easing.type: IslandMotion.easeMove } }
         Behavior on scale   { NumberAnimation { duration: IslandMotion.durationMedium; easing.type: IslandMotion.easeMove } }
 
-        // ── Flip rotation ─────────────────────────────────────────────
         transform: Rotation {
             id: flipRotation
             origin.x: card.width / 2
@@ -165,7 +158,6 @@ PanelWindow {
         ]
         state: root.showEqualizer ? "equalizer" : "player"
 
-        // Face swap happens at 90° mid-flip so content lines up
         property bool showEqFace: false
         transitions: Transition {
             SequentialAnimation {
@@ -181,9 +173,6 @@ PanelWindow {
             }
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // FRONT FACE — Music Player
-        // ════════════════════════════════════════════════════════════════
         Item {
             anchors.fill: parent
             visible: !card.showEqFace
@@ -201,16 +190,13 @@ PanelWindow {
                 anchors { fill: parent; margins: 18 }
                 spacing: 10
 
-                // ── Row 1: Album art + track info ───────────────────────
                 Row {
                     width: parent.width
                     spacing: 16
 
-                    // Album art circle
                     Item {
                         width: 100; height: 100
 
-                        // Spinning container
                         Item {
                             id: popupArtContainer
                             anchors.fill: parent
@@ -245,7 +231,7 @@ PanelWindow {
                                 maskSource: artMask
                                 visible: root.currentArtUrl !== "" && artImg.status === Image.Ready
                             }
-                            // Darken when paused
+                            
                             Rectangle {
                                 anchors.fill: parent
                                 radius: width / 2
@@ -256,7 +242,6 @@ PanelWindow {
                             }
                         }
 
-                        // Fallback note
                         Rectangle {
                             anchors.fill: parent
                             radius: width / 2
@@ -274,7 +259,6 @@ PanelWindow {
                                 renderType: Text.NativeRendering
                             }
 
-                            // Pulse ring when playing without art
                             Rectangle {
                                 anchors.fill: parent
                                 radius: parent.radius
@@ -291,7 +275,6 @@ PanelWindow {
                             }
                         }
 
-                        // Hairline ring over art
                         Rectangle {
                             anchors.fill: parent
                             radius: width / 2
@@ -300,7 +283,6 @@ PanelWindow {
                             border.color: IslandMotion.surfaceBorderColor
                         }
 
-                        // Pulse ring over art when playing
                         Rectangle {
                             anchors.fill: parent
                             radius: width / 2
@@ -317,7 +299,6 @@ PanelWindow {
                         }
                     }
 
-                    // Track info + EQ flip button
                     Item {
                         width: parent.width - 100 - 16
                         height: 100
@@ -352,7 +333,6 @@ PanelWindow {
                             }
                         }
 
-                        // ── EQ flip button ────────────────────────────
                         Rectangle {
                             id: eqFlipBtn
                             anchors.right:          parent.right
@@ -384,7 +364,6 @@ PanelWindow {
                     }
                 }
 
-                // ── Row 2: Progress bar ─────────────────────────────────
                 Item {
                     width: parent.width; height: 20
 
@@ -417,7 +396,6 @@ PanelWindow {
                             Behavior on width { NumberAnimation { duration: 500; easing.type: Easing.OutCubic } }
                         }
 
-                        // Scrub knob
                         Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             x: progressFill.width - width / 2
@@ -453,7 +431,6 @@ PanelWindow {
                     }
                 }
 
-                // ── Playing-in label (Spotify / YouTube Music / empty) ──
                 Item {
                     width: parent.width
                     height: root.mediaWindowLabel !== "" ? 20 : 0
@@ -473,7 +450,6 @@ PanelWindow {
                     }
                 }
 
-                // ── Row 3: Controls — shuffle | prev | play | next | loop ──
                 Item {
                     width: parent.width; height: 36
 
@@ -481,7 +457,6 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 26
 
-                        // Shuffle
                         Item {
                             width: 24; height: 24
                             opacity: root.activePlayer && root.activePlayer.shuffle ? 1.0 : 0.35
@@ -525,7 +500,6 @@ PanelWindow {
                             }
                         }
 
-                        // Previous
                         Item {
                             width: 28; height: 28
                             scale: prevMouse.pressed ? 0.8 : 1.0
@@ -551,7 +525,6 @@ PanelWindow {
                             }
                         }
 
-                        // Play / Pause
                         Item {
                             width: 32; height: 32
                             scale: playMouse.pressed ? 0.85 : 1.0
@@ -588,7 +561,6 @@ PanelWindow {
                             }
                         }
 
-                        // Next
                         Item {
                             width: 28; height: 28
                             scale: nextMouse.pressed ? 0.8 : 1.0
@@ -614,7 +586,6 @@ PanelWindow {
                             }
                         }
 
-                        // Loop
                         Item {
                             width: 24; height: 24
                             opacity: root.activePlayer
@@ -663,9 +634,6 @@ PanelWindow {
             }
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // BACK FACE — Equalizer only, no album art, full card width
-        // ════════════════════════════════════════════════════════════════
         Item {
             anchors.fill: parent
             visible: card.showEqFace
@@ -686,7 +654,6 @@ PanelWindow {
                 clip: true
             }
 
-            // ‹ back button — top-left, z:2 so it floats above EQ panel
             Rectangle {
                 id: backFlipBtn
                 anchors.left:    parent.left;    anchors.leftMargin:   14
@@ -715,7 +682,6 @@ PanelWindow {
                 }
             }
 
-            // EQ fills entire card — sliders get full width and height
             EqualizerPanel {
                 anchors {
                     top:    parent.top;    topMargin:    14

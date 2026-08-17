@@ -6,10 +6,6 @@ import IslandBackend
 import "../shared"
 import "../island"
 
-// Sidebar power menu — centered on screen, replica of PowerMenuLayer
-// without the settings/control-center button. Opened by the power
-// icon at the bottom of the sidebar pill.
-
 PanelWindow {
     id: root
 
@@ -31,7 +27,6 @@ PanelWindow {
     function close() { popupOpen = false }
     function toggle(){ popupOpen = !popupOpen }
 
-    // ── Window setup ──────────────────────────────────────────────────
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     aboveWindows: true
@@ -51,7 +46,6 @@ PanelWindow {
     MouseArea { anchors.fill: parent; enabled: root.popupOpen; onClicked: root.close(); z: -1 }
     Keys.onEscapePressed: root.close()
 
-    // ── Card ──────────────────────────────────────────────────────────
     Item {
         id: card
         anchors.centerIn: parent
@@ -76,35 +70,30 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: 22
 
-            // Lock
             PowerMenuButton {
                 glyph: "\uf023"
                 iconFontFamily: root.iconFontFamily
                 onActivated: { powerExec.run("nohup hyprlock >/dev/null 2>&1 &"); root.close() }
             }
 
-            // Sleep
             PowerMenuButton {
                 glyph: "\uf186"
                 iconFontFamily: root.iconFontFamily
                 onActivated: { powerExec.run("nohup systemctl suspend >/dev/null 2>&1 &"); root.close() }
             }
 
-            // Logout
             PowerMenuButton {
                 glyph: "\uf2f5"
                 iconFontFamily: root.iconFontFamily
                 onActivated: { powerExec.run("nohup uwsm stop >/dev/null 2>&1 &"); root.close() }
             }
 
-            // Reboot
             PowerMenuButton {
                 glyph: "\uf021"
                 iconFontFamily: root.iconFontFamily
                 onActivated: { powerExec.run("nohup systemctl reboot >/dev/null 2>&1 &"); root.close() }
             }
 
-            // Shutdown
             PowerMenuButton {
                 glyph: "\uf011"
                 iconFontFamily: root.iconFontFamily

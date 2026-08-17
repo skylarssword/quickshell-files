@@ -72,7 +72,6 @@ PanelWindow {
         onTriggered: root._showing = false
     }
 
-    // Always visible so animations can run
     color: "transparent"
     anchors { top: true; left: true; right: true }
     exclusiveZone: 0

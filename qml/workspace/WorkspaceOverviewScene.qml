@@ -33,16 +33,11 @@ Item {
         onCloseRequested: root.closeRequested()
     }
 
-    // ── Workspace number labels ───────────────────────────────────────────────
-    // Rendered on top of the cells. Positioned relative to overviewView which
-    // is anchors.centerIn: parent, so we mirror that anchor.
     Item {
         id: labelLayer
         visible: root.showCondition
         anchors.centerIn: parent
-        // Match the workspaceStage size: outerPadding is 14 inside the card,
-        // so stage = card - 2*outerPadding.  We position relative to the card
-        // centre which is the same centre as overviewView.
+        
         width:  overviewView.width  - overviewView.outerPadding * 2
         height: overviewView.height - overviewView.outerPadding * 2
 
@@ -77,9 +72,6 @@ Item {
         }
     }
 
-    // ── Middle-click to close + tooltip ──────────────────────────────────────
-    // Sits on top of the label layer. Left/right fall through via
-    // propagateComposedEvents so the existing overlay still handles them.
     Item {
         id: interactionLayer
         anchors.fill: parent
@@ -97,7 +89,7 @@ Item {
             propagateComposedEvents: true
 
             onPositionChanged: (mouse) => {
-                // Coords relative to overviewView (which is centered in root)
+                
                 const ox = root.width  / 2 - overviewView.width  / 2
                 const oy = root.height / 2 - overviewView.height / 2
                 const lx = mouse.x - ox
@@ -127,7 +119,7 @@ Item {
                 const addr = overviewView.windowAddressAtPoint(mouse.x - ox, mouse.y - oy)
                 if (addr !== "") {
                     const disp = Hyprland.dispatch ?? null
-                    // Fix: Target the new Lua dispatch API object explicitly
+                    
                     if (disp) disp('hl.dsp.window.close({ address = "' + addr + '" })')
                 }
                 mouse.accepted = true
@@ -137,7 +129,6 @@ Item {
 
         }
 
-        // ── Tooltip popup ─────────────────────────────────────────────────
         Rectangle {
             visible: interactionLayer.tooltipVisible && interactionLayer.tooltipText !== ""
             x: Math.min(interactionLayer.tooltipX, root.width  - width  - 8)

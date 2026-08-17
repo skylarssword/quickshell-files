@@ -11,10 +11,6 @@ Item {
     property string iconFontFamily: ""
     property string textFontFamily: ""
 
-    // Drives the entrance/exit fade below. The capsule (parent) morphs to the
-    // search width/height on the same trigger -- delaying our own fade-in
-    // lets the capsule finish reshaping before content appears, which is
-    // what removes the "refresh/pop" look search previously had.
     property bool showCondition: true
 
     opacity: showCondition ? 1 : 0
@@ -31,19 +27,14 @@ Item {
     signal closeRequested()
     signal launchRequested(string cmd, bool isCommand)
 
-    // ── Sizing ───────────────────────────────────────────────────────────
-    // The whole thing (input row + results) now lives in ONE capsule that
-    // grows in place. No separate box is rendered below it anymore.
     readonly property int inputRowHeight: 44
-    readonly property int iconCellSize: 92        // was 78 — closer to mugen's 100x100 cell
-    readonly property int iconSize: 40             // was 32 — matches mugen's 40px app icons
-    readonly property int gridRowCount: 3   // was 2 — taller search capsule overall
-    readonly property int gridTopMargin: 10  // was 6
+    readonly property int iconCellSize: 92        
+    readonly property int iconSize: 40             
+    readonly property int gridRowCount: 3   
+    readonly property int gridTopMargin: 10  
     readonly property int gridSideMargin: 14
     readonly property int gridBottomMargin: 12
 
-    // Columns are driven by how many apps we actually have, capped so the
-    // capsule doesn't run off-screen. Tune maxCols to taste.
     readonly property int minCols: 6
     readonly property int maxCols: 10
     readonly property int appCountForLayout: isWallpaperMode
@@ -55,17 +46,10 @@ Item {
         return Math.max(minCols, Math.min(maxCols, need))
     }
 
-    readonly property bool hasResults: true   // grid is now always present
-    readonly property int footerHeight: 18    // for the "Loading…" / "N apps" hint row, mugen-style
+    readonly property bool hasResults: true   
+    readonly property int footerHeight: 18    
     readonly property int appGridHeight: gridTopMargin + (iconCellSize * gridRowCount) + gridBottomMargin + footerHeight
 
-    // Total capsule width/height the parent (mainCapsule) should bind to.
-    // NOTE: explicitly reads wallpaperHubLoader.item.viewMode (even though
-    // unused in the expression below) to guarantee QML's dependency tracker
-    // registers viewMode as a tracked dependency — without this, switching
-    // between quick/grid mode could fail to re-trigger this binding if the
-    // tracker's initial evaluation happened before wallpaperHubLoader.item
-    // existed, silently freezing capsuleHeight on a stale value.
     property int capsuleWidth: isWallpaperMode
         ? (wallpaperHubLoader.item
             ? (wallpaperHubLoader.item.viewMode, wallpaperHubLoader.item.capsuleWidth)
@@ -83,7 +67,6 @@ Item {
     property var allApps: []
     property var displayApps: filteredApps
 
-    // ── Favorites (right-click to favorite, ported from mugen-shell) ──────
     property var favoritesSet: ({})
 
     function isFavorite(execKey) {
@@ -116,7 +99,7 @@ Item {
                     root.favoritesSet = set
                     root.rebuildFiltered()
                 } catch (e) {
-                    // no favorites file yet — start empty
+                    
                 }
                 loadFavoritesProcess._buf = ""
             }
@@ -137,7 +120,6 @@ Item {
     }
     property string searchText: ""
 
-    // ── WallpaperHub trigger ───────────────────────────────────────────
     readonly property bool isWallpaperMode: {
         let q = searchText.trim().toLowerCase()
         return q === "wallpaper"   || q === "wallpapers" ||
@@ -149,12 +131,10 @@ Item {
 
     onIsWallpaperModeChanged: {
         if (isWallpaperMode) {
-            // Outer input freezes on whatever triggered the mode (e.g. "wallpaper").
-            // Focus hands off to WallpaperHub's own search box.
+            
             wallpaperFocusTimer.restart()
         } else {
-            // Coming back from wallpaper mode — clear the outer text and
-            // reclaim focus/keystrokes here.
+            
             searchInput.text = ""
             root.searchText = ""
             searchInput.forceActiveFocus()
@@ -175,15 +155,6 @@ Item {
         rebuildFiltered()
     }
 
-    // ── App loader ──────────────────────────────────────────────────────
-    // Ported directly from mugen-shell's wiring: a standalone python3 +
-    // GTK/GIO script (scripts/list-apps.py) does proper desktop-file and
-    // icon-theme resolution, rather than the old bash+find cache file
-    // (which depended on a pre-existing dock-apps-v2.tsv that wasn't
-    // self-contained). Re-runs each time apps are (re)loaded so installs/
-    // removals show up without a shell restart, but the JSON is only
-    // re-parsed when it actually changed (lastAppsJson dedupe), so this
-    // never causes a visible reload/flicker.
     property string lastAppsJson: ""
     property bool appsLoaded: false
 
@@ -225,7 +196,7 @@ Item {
                     root.appsLoaded = true
                     root.rebuildFiltered()
                 } catch (e) {
-                    // malformed output this cycle -- keep last known app list
+                    
                 }
             }
         }
@@ -257,7 +228,7 @@ Item {
 
     function rebuildFiltered() {
         if (isWallpaperMode) {
-            // Hub mode owns its own filtering entirely; nothing to do here.
+            
             return
         }
 
@@ -285,8 +256,6 @@ Item {
         )
     }
 
-    // Reclaim focus if anything inside the pill is hovered (app-search mode only —
-    // wallpaper mode manages its own focus once active).
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
@@ -304,7 +273,6 @@ Item {
         anchors.right: parent.right
         spacing: 0
 
-        // ── Search pill input row ───────────────────────────────────────
         Item {
             width: parent.width
             height: root.inputRowHeight
@@ -335,8 +303,7 @@ Item {
                     verticalAlignment: TextInput.AlignVCenter
                     activeFocusOnPress: true
                     clip: true
-                    // Frozen/read-only once wallpaper mode has taken over —
-                    // it still displays the trigger text but stops eating keys.
+                    
                     enabled: !root.isWallpaperMode
 
                     onTextChanged: root.searchText = text
@@ -398,7 +365,6 @@ Item {
             }
         }
 
-        // ── Wallpaper hub (swapped in below the input row) ───────────────
         Loader {
             id: wallpaperHubLoader
             width: parent.width
@@ -416,7 +382,6 @@ Item {
             }
         }
 
-        // ── Command mode hint (unchanged behavior, just relocated) ──────
         Item {
             width: parent.width
             height: root.appGridHeight
@@ -483,7 +448,6 @@ Item {
             }
         }
 
-        // ── App grid (always visible, no command mode, no wallpaper mode) ─
         GridView {
             id: searchGridView
             width: parent.width
@@ -522,7 +486,6 @@ Item {
                 property var app: modelData || {}
                 property bool isSelected: root.selectedIndex === index
 
-                // Hover/selected overlay — transparent at rest, white wash on hover.
                 Rectangle {
                     anchors.centerIn: parent
                     width: parent.width - 6
@@ -565,7 +528,6 @@ Item {
                             visible: gridAppIcon.status !== Image.Ready
                         }
 
-                        // Favorite star -- right-click any app to toggle.
                         Text {
                             renderType: Text.NativeRendering
                             anchors.right: parent.right
@@ -615,8 +577,6 @@ Item {
             }
         }
 
-        // ── Footer hint row (mugen-style: loading state, right-click hint,
-        // or a live count of the currently filtered apps) ─────────────────
         Text {
             renderType: Text.NativeRendering
             width: parent.width

@@ -2,7 +2,6 @@ import QtQuick
 import Quickshell.Services.Mpris
 import IslandBackend
 
-
 Item {
     id: root
 

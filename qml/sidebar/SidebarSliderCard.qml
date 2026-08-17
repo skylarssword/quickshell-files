@@ -2,9 +2,6 @@ import QtQuick
 import IslandBackend
 import "../shared"
 
-// ── Slider card used inside SidebarControlCenterLayer ────────────────────────
-// Replica of ControlSliderCard, self-contained.
-
 Rectangle {
     id: root
 
@@ -50,7 +47,6 @@ Rectangle {
             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
             height: 22; radius: 11; color: root.trackColor; clip: true
 
-            // Icon
             Rectangle {
                 anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                 anchors.leftMargin: 10; width: 18; height: 18; radius: 9; color: "transparent"
@@ -61,7 +57,6 @@ Rectangle {
                 }
             }
 
-            // Fill
             Rectangle {
                 width: root.value <= 0.001
                     ? 0
@@ -69,7 +64,6 @@ Rectangle {
                 height: parent.height; radius: parent.radius; color: IslandMotion.textPrimary
             }
 
-            // Knob
             Rectangle {
                 x: Math.max(0, Math.min(parent.width - width, parent.width * root.value - width / 2))
                 y: -1; width: root.knobSize; height: root.knobSize; radius: root.knobSize / 2

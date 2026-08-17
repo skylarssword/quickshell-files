@@ -27,11 +27,7 @@ Item {
     readonly property int titlePadding: 14
     property string textFontFamily: "sans-serif"
 
-    // ── App-grid / search launcher glyph ─────────────────────────────────
-    // nf-md-view_grid  (a proper 4-square / waffle grid) — same visual weight
-    // as mugen-shell's launcher icon. Falls back to nf-fa-th-large (\uf009)
-    // if your font doesn't carry the md set.
-    readonly property string gridGlyph: "\udb80\uddc4"  // 󰇄  nf-md-view_grid
+    readonly property string gridGlyph: "\udb80\uddc4"  
     readonly property string tideIpcPath: "/usr/share/tide-island"
     readonly property int gridIconSize: 24
     readonly property int dividerWidth: 2
@@ -44,7 +40,6 @@ Item {
         command: ["qs", "ipc", "-p", root.tideIpcPath, "call", "tide", "toggleSearch"]
     }
 
-    // ── Active window title from Hyprland ────────────────────────────────
     readonly property var focusedToplevel: {
         if (!Hyprland.toplevels || !Hyprland.toplevels.values) return null
         const all = Hyprland.toplevels.values
@@ -81,7 +76,6 @@ Item {
         NumberAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeArrive }
     }
 
-    // ── Combined pill: grid icon | divider | workspace dots ──────────────
     Rectangle {
         id: mainPill
         x: 0
@@ -114,7 +108,6 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: root.dotSpacing
 
-            // ── Grid icon (search / app launcher) ──────────────────────
             Item {
                 width: root.gridIconSize
                 height: root.gridIconSize
@@ -144,7 +137,6 @@ Item {
                 }
             }
 
-            // ── Divider ─────────────────────────────────────────────────
             Rectangle {
                 width: root.dividerWidth
                 height: root.dividerHeight
@@ -153,7 +145,6 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            // ── Workspace dots ──────────────────────────────────────────
             Row {
                 id: dotsRow
                 spacing: root.dotSpacing
@@ -194,7 +185,6 @@ Item {
         }
     }
 
-    // ── Window title bubble (separate pill) ───────────────────────────────
     Rectangle {
         id: titleBubble
         x: mainPill.width + root.bubbleGap

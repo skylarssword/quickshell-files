@@ -40,7 +40,7 @@ QtObject {
     readonly property color textSecondary: Qt.rgba(0.90, 0.90, 0.95, 0.94)
     readonly property color textFaint:     Qt.rgba(0.82, 0.82, 0.90, 0.88)
 
-    // ---- surface border (thin hairline, mugen-style) -------------------
+    // ---- surface border (thin hairline) -------------------
     readonly property color surfaceBorderColor: Qt.rgba(0.35, 0.35, 0.40, 0.40)
     readonly property int surfaceBorderWidth: 1
 }

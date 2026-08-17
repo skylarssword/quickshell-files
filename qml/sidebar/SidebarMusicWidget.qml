@@ -4,7 +4,6 @@ import Quickshell.Services.Mpris
 import IslandBackend
 import "../shared"
 
-// ── Small circular music button inside the sidebar pill ──────────────────────
 Item {
     id: root
 
@@ -39,12 +38,10 @@ Item {
         scale: btnMouse.pressed ? 0.88 : 1.0
         Behavior on scale { NumberAnimation { duration: IslandMotion.micro; easing.type: Easing.OutBack } }
 
-        // ── Spinning album art ─────────────────────────────────────────
         Item {
             id: artContainer
             anchors.fill: parent
 
-            // Spin when playing, stop when paused
             RotationAnimation on rotation {
                 running:   root.isPlaying
                 from:      artContainer.rotation
@@ -53,7 +50,7 @@ Item {
                 direction: RotationAnimation.Clockwise
                 loops:     Animation.Infinite
             }
-            // Smoothly stop at current angle when paused — no jerk
+            
             NumberAnimation {
                 running:  !root.isPlaying
                 target:   artContainer
@@ -85,7 +82,6 @@ Item {
                 visible: root.currentArtUrl !== "" && artImage.status === Image.Ready
             }
 
-            // Darken overlay when paused
             Rectangle {
                 anchors.fill: parent
                 radius: parent.width / 2
@@ -95,7 +91,6 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 300 } }
             }
 
-            // Pulse ring OVER art when playing
             Rectangle {
                 anchors.fill: parent
                 radius: parent.width / 2
@@ -112,7 +107,6 @@ Item {
             }
         }
 
-        // ── Music note fallback ────────────────────────────────────────
         Text {
             anchors.centerIn: parent
             visible: root.currentArtUrl === "" || artImage.status !== Image.Ready
@@ -124,7 +118,6 @@ Item {
             Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
         }
 
-        // ── Pulse ring (no-art playing state) ─────────────────────────
         Rectangle {
             anchors.fill: parent
             radius: parent.radius
@@ -150,7 +143,7 @@ Item {
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         onClicked: (mouse) => {
             if (mouse.button === Qt.RightButton) {
-                // Right-click: quick pause/play toggle
+                
                 if (!root.activePlayer || !root.activePlayer.canControl) return
                 if (root.activePlayer.canTogglePlaying)
                     root.activePlayer.togglePlaying()

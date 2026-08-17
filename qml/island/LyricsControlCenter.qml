@@ -19,14 +19,9 @@ Item {
 
     property var lyricManager: null
 
-    // ── Wired in from islandContainer so we can drive real transport
-    // controls (seek / shuffle / loop / play-pause) and show album art. ──
     property var    activePlayer: null
     property string currentArtUrl: ""
 
-    // expandedView is bound in from root (persisted in appearance-settings.json,
-    // same pattern as capsuleUseWalColor etc). We never assign it locally —
-    // only request a change via this signal so the parent binding stays intact.
     property bool expandedView: false
     signal expandedViewToggleRequested(bool expanded)
 
@@ -69,8 +64,6 @@ Item {
     property string fileErrorText: ""
     property string fileInfoText:  ""
 
-    // ── Independent playback polling (self-contained fallback, used only
-    // if no activePlayer is bound in from the parent) ──────────────────
     property var _playersList: Mpris.players.values !== undefined ? Mpris.players.values : Mpris.players
     property var _selfDetectedPlayer: {
         if (!_playersList || _playersList.length === 0) return null
@@ -84,13 +77,11 @@ Item {
     readonly property bool isPlayingNow: controlCenter._effectivePlayer !== null
         && controlCenter._effectivePlayer.playbackState === MprisPlaybackState.Playing
 
-    // ── Local lyric viewer state (independent of LyricManager's own display state) ──
-    property string viewerMode: "none"   // "none" | "synced" | "plain"
-    property var    viewerLines: []      // [{time, text}] for synced mode
-    property string viewerPlainText: ""  // raw text for plain mode
+    property string viewerMode: "none"   
+    property var    viewerLines: []      
+    property string viewerPlainText: ""  
     property int    viewerActiveIndex: -1
 
-    // ── Expanded transport display state ──
     property real   trackProgressLocal: 0
     property string timePlayedLocal: "0:00"
     property string timeTotalLocal: "0:00"
@@ -134,7 +125,6 @@ Item {
         }
     }
 
-    // ── Position/time helpers — same seconds-vs-ms heuristic used throughout ──
     function _positionToMs(rawPos) {
         return rawPos < 10000 ? rawPos * 1000 : rawPos / 1000
     }
@@ -684,12 +674,12 @@ MouseArea {
                                 lrclibPanelOpen = !lrclibPanelOpen
                                 
                                 if (lrclibPanelOpen) {
-                                    // Instantly force the lyric box away
+                                    
                                     controlCenter.viewerMode = "none"
                                     if (lrclibResults.length === 0)
                                         controlCenter.searchLrcLib()
                                 } else {
-                                    // If closing the panel, restore the correct lyric layout state
+                                    
                                     controlCenter._restoreFromLyricManager()
                                 }
                             }
@@ -786,10 +776,10 @@ MouseArea {
                                 localFilePanelOpen = !localFilePanelOpen
                                 
                                 if (localFilePanelOpen) {
-                                    // Instantly force the lyric box away
+                                    
                                     controlCenter.viewerMode = "none"
                                 } else {
-                                    // If closing the panel, restore the correct lyric layout state
+                                    
                                     controlCenter._restoreFromLyricManager()
                                 }
                             }
@@ -1054,8 +1044,6 @@ Rectangle {
             }
         }
 
-        // ── Lyric viewer — minimized (compact card) or maximized
-        //    (spinning art + right-side lyrics + transport controls) ──
         Item {
             id: lyricViewer
             width: parent.width
@@ -1070,7 +1058,6 @@ Rectangle {
                 NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
             }
 
-// ── Minimized presentation ──
             Rectangle {
                 anchors.fill: parent
                 radius: 16
@@ -1156,13 +1143,11 @@ Rectangle {
                 }
             }
 
-            // ── Maximized presentation ──
             Column {
                 anchors.fill: parent
                 visible: controlCenter.expandedView
                 spacing: 10
 
-                // Spinning art + lyric lines
                 Item {
                     width: parent.width
                     height: 150
@@ -1282,7 +1267,6 @@ Rectangle {
                     }
                 }
 
-                // Progress / seek bar
                 Item {
                     width: parent.width
                     height: 16
@@ -1343,7 +1327,6 @@ Rectangle {
                     }
                 }
 
-                // Transport controls: shuffle, -15, play/pause, +15, loop
                 Item {
                     width: parent.width
                     height: 34

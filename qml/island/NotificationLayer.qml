@@ -41,9 +41,6 @@ Item {
     anchors.margins: 0
     opacity: showCondition ? 1 : 0
 
-    // Enter is delayed so the capsule finishes reshaping before content
-    // fades in -- this is what removes the "refresh/blink" feel on state
-    // switches. Exit has no delay: content should leave immediately.
     Behavior on opacity {
         SequentialAnimation {
             PauseAnimation { duration: showCondition ? IslandMotion.contentEnterDelay : 0 }
@@ -54,8 +51,6 @@ Item {
         }
     }
 
-    // Subtle drop-in: content slides down slightly while it fades, like a
-    // notification actually arriving rather than just appearing.
     transform: Translate {
         y: showCondition ? 0 : -6
         Behavior on y {
@@ -70,7 +65,6 @@ TextMetrics {
         font.weight: Font.DemiBold
         text: contentText
     }
-
 
     Row {
         anchors.fill: parent

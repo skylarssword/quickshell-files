@@ -49,7 +49,6 @@ PanelWindow {
         }
     }
 
-    // ── Appearance state ─────────────────────────────────────────────────
     property real capsuleOpacity: 0.20
     property bool capsuleUseWalColor: false
     property var  capsuleWalColors: []
@@ -124,7 +123,6 @@ PanelWindow {
         }
     }
 
-    // Focus: give it a tick so the window is mapped first
     Timer {
         id: focusTimer
         interval: 50; repeat: false
@@ -134,7 +132,6 @@ PanelWindow {
         }
     }
 
-    // ── Config ───────────────────────────────────────────────────────────
     readonly property string wallpaperFolder: IslandConfiguration.wallpaperFolder
     readonly property string thumbCacheDir:   IslandConfiguration.thumbCacheDir
     readonly property string postCommand:     IslandConfiguration.postCommand
@@ -144,7 +141,6 @@ PanelWindow {
         "--transition-type grow --transition-step 90 --transition-angle 0 " +
         "--transition-duration 2 --transition-fps 60"
 
-    // ── State ────────────────────────────────────────────────────────────
     property var staticWalls:   []
     property var videoWalls:    []
     property var allWallpapers: staticWalls.concat(videoWalls)
@@ -173,7 +169,6 @@ PanelWindow {
 
     function isVideo(path) { return /\.(mp4|mkv|webm|mov|avi|gif)$/i.test(path) }
 
-    // ── Scanners ─────────────────────────────────────────────────────────
     Process {
         id: staticScanner
         command: ["bash", "-c",
@@ -206,7 +201,6 @@ PanelWindow {
         }
     }
 
-    // ── Thumb map ────────────────────────────────────────────────────────
     Process {
         id: thumbMapProc
         property string _buf: ""
@@ -275,7 +269,6 @@ PanelWindow {
         }
     }
 
-    // ── Color cache ──────────────────────────────────────────────────────
     Process {
         id: colorCacheLoader
         property string _buf: ""
@@ -352,7 +345,6 @@ PanelWindow {
             JSON.stringify(root.colorMap) + "' > " + JSON.stringify(root.colorCacheFile)]
     }
 
-    // ── Color bucketing ──────────────────────────────────────────────────
     function bucketFor(hex) {
         if (!hex) return "mono"
         let m = /^#?([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})$/.exec(hex)
@@ -374,7 +366,6 @@ PanelWindow {
         return "pink"
     }
 
-    // ── Wallpaper setters ────────────────────────────────────────────────
     Process { id: awwwProc }
     function setStaticWallpaper(path) {
         root.currentWallpaper = path; root.lastStaticWallpaper = path
@@ -417,16 +408,11 @@ PanelWindow {
         else root.setStaticWallpaper(path)
     }
 
-    // ── UI constants ─────────────────────────────────────────────────────
-    // cellWidth is the LIST item slot width (selected card fills it at scale 1.0)
-    // cellHeight is fixed and independent of carousel height — cards are tall rectangles
-    // The carousel itself fills available vertical space; cards are vertically centered within
-    readonly property int cellWidth:       1100  // wider, more horizontal
-    readonly property int cellHeight:      440   // flatter height ratio
-    readonly property int skew:            70    // aggressive parallelogram slant
+    readonly property int cellWidth:       1100  
+    readonly property int cellHeight:      440   
+    readonly property int skew:            70    
     readonly property int bottomBarHeight: 64
 
-    // ── Full-screen backdrop ─────────────────────────────────────────────
     Rectangle {
         id: backdrop
         anchors.fill: parent
@@ -444,12 +430,11 @@ PanelWindow {
         FocusScope {
             id: focusScope
             anchors.fill: parent
-            focus: root.pickerVisible       // ← keeps focus while open
+            focus: root.pickerVisible       
             activeFocusOnTab: false
 
             Keys.onEscapePressed: root.pickerVisible = false
 
-            // ── Carousel ─────────────────────────────────────────────────
             ListView {
                 id: carousel
                 anchors {
@@ -462,7 +447,7 @@ PanelWindow {
                 orientation: ListView.Horizontal
                 spacing: -620
                 clip: false
-                focus: true                 // ← carousel gets key events
+                focus: true                 
 
                 highlightFollowsCurrentItem: true
                 highlightMoveDuration: 280
@@ -509,7 +494,7 @@ PanelWindow {
                 delegate: Item {
                     id: cell
                     width: root.cellWidth
-                    height: carousel.height      // slot fills carousel height
+                    height: carousel.height      
 
                     required property int index
                     property bool   isCurrent:          ListView.isCurrentItem
@@ -522,19 +507,17 @@ PanelWindow {
                         return ""
                     }
 
-                    // dist-based scale — independent of carousel height
                     property int  dist:        Math.abs(index - carousel.currentIndex)
                     property real cardScale:   dist === 0 ? 1.0 : dist === 1 ? 0.52 : 0.32
                     property real cardOpacity: dist === 0 ? 1.0 : dist === 1 ? 0.70 : 0.45
                     z: 10 - cell.dist
 
-                    // The actual card — fixed height, centered vertically in the slot
                     Item {
                         id: shapeRoot
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.verticalCenter:   parent.verticalCenter
                         width:  root.cellWidth - 12
-                        height: root.cellHeight          // ← fixed tall height, not carousel.height
+                        height: root.cellHeight          
 
                         scale:   cell.cardScale
                         opacity: cell.cardOpacity
@@ -591,7 +574,6 @@ PanelWindow {
                             }
                         }
 
-                        // Hairline border always
                         Canvas {
                             id: hairlineOutline; anchors.fill: parent
                             onPaint: {
@@ -609,7 +591,6 @@ PanelWindow {
                             Component.onCompleted: requestPaint()
                         }
 
-                        // Selection outline (current only)
                         Canvas {
                             id: outline; anchors.fill: parent
                             property real ow: cell.isCurrent ? 2.5 : 0
@@ -641,7 +622,6 @@ PanelWindow {
                 }
             }
 
-            // Empty / loading placeholder (sits in same space as carousel)
             Text {
                 anchors {
                     left: parent.left; right: parent.right
@@ -659,13 +639,11 @@ PanelWindow {
                 }
             }
 
-            // ── Bottom bar ────────────────────────────────────────────────
             Item {
                 id: bottomBar
                 anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
                 height: root.bottomBarHeight
 
-                // Media filter (left)
                 Rectangle {
                     id: mediaFilterButton
                     width: 36; height: 36; radius: 18
@@ -689,7 +667,6 @@ PanelWindow {
                     }
                 }
 
-                // Color swatches (center)
                 Row {
                     anchors.centerIn: parent; spacing: 12
                     Repeater {
@@ -726,7 +703,6 @@ PanelWindow {
                     }
                 }
 
-                // Random (right)
                 Rectangle {
                     id: randomButton
                     width: 36; height: 36; radius: 18

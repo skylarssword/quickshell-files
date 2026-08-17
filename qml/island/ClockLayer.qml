@@ -2,10 +2,6 @@ import QtQuick
 import IslandBackend
 import "../shared"
 
-// The "time-only" clock display -- redone as a vertical stack (big time on
-// top, small date underneath) matching mugen's stacked clock style. This
-// component only covers this one state; other clocks (workspace bubble
-// title, swipe lyrics panel, etc.) are untouched.
 Item {
     id: root
 

@@ -4,8 +4,6 @@ import Quickshell.Wayland
 import IslandBackend
 import "../shared"
 
-// ── Centered notification center popup ───────────────────────────────────────
-
 PanelWindow {
     id: root
 
@@ -83,7 +81,6 @@ PanelWindow {
         Item {
             anchors.fill: parent
 
-            // ── Title row ─────────────────────────────────────────────
             Item {
                 id: titleRow
                 anchors.top: parent.top; anchors.topMargin: 18
@@ -99,7 +96,6 @@ PanelWindow {
                     font.family: root.textFontFamily; font.pixelSize: 18; font.weight: Font.Medium
                 }
 
-                // DND toggle
                 Rectangle {
                     id: dndBtn
                     anchors.right: clearBtn.left; anchors.rightMargin: 8
@@ -120,7 +116,6 @@ PanelWindow {
                     MouseArea { id: dndMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.dndToggleRequested() }
                 }
 
-                // Clear all
                 Rectangle {
                     id: clearBtn
                     anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -148,7 +143,6 @@ PanelWindow {
                 }
             }
 
-            // ── Empty state ───────────────────────────────────────────
             Text {
                 renderType: Text.NativeRendering
                 anchors.centerIn: parent
@@ -158,7 +152,6 @@ PanelWindow {
                 visible: root.notificationHistory.length === 0
             }
 
-            // ── Notification list ─────────────────────────────────────
             ListView {
                 id: notifList
                 anchors.top: titleRow.bottom; anchors.topMargin: 16
@@ -167,7 +160,7 @@ PanelWindow {
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 12
                 spacing: 8; clip: true
                 visible: root.notificationHistory.length > 0
-                // Use array directly so model updates when items are removed
+                
                 model: root.notificationHistory
                 boundsBehavior: Flickable.StopAtBounds
                 flickDeceleration: 3000
@@ -187,7 +180,6 @@ PanelWindow {
 
                     Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutQuart } }
 
-                    // ── Swipe state (mirrors main NotificationCenterLayer) ─
                     property real dragX:          0
                     property bool dragging:       false
                     property bool pendingDismiss: false
@@ -218,7 +210,6 @@ PanelWindow {
                         return Math.floor(hrs / 24) + "d ago"
                     }
 
-                    // ── Trash reveal behind card ──────────────────────
                     Rectangle {
                         anchors.right: parent.right
                         anchors.top: parent.top; anchors.bottom: parent.bottom
@@ -238,7 +229,6 @@ PanelWindow {
                         }
                     }
 
-                    // ── Card ──────────────────────────────────────────
                     Rectangle {
                         id: notifCard
                         x: notifRow.dragX; y: 0
@@ -250,7 +240,6 @@ PanelWindow {
                         border.color: IslandMotion.surfaceBorderColor
                         Behavior on color { ColorAnimation { duration: 120 } }
 
-                        // App icon
                         Item {
                             width: 26; height: 26
                             anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 9
@@ -269,7 +258,6 @@ PanelWindow {
                             }
                         }
 
-                        // Timestamp
                         Text {
                             renderType: Text.NativeRendering
                             anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 9
@@ -278,7 +266,6 @@ PanelWindow {
                             font.pixelSize: 9; font.family: root.textFontFamily; opacity: 0.6
                         }
 
-                        // Text content
                         Column {
                             anchors.left: parent.left; anchors.right: parent.right
                             anchors.top: parent.top
@@ -311,7 +298,6 @@ PanelWindow {
                             }
                         }
 
-                        // ── Mouse: swipe + tap ────────────────────────
                         MouseArea {
                             id: cardMouse; anchors.fill: parent; hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor

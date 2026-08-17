@@ -18,7 +18,6 @@ readonly property string currentLyric:  _currentLyric
         const nextArtist = artist || ""
         const nextTitle  = title  || ""
 
-        // Already have valid data loaded for this exact track — skip reload entirely.
         if (nextArtist === _artist && nextTitle === _title
                 && _backendStatus !== "idle" && _backendStatus !== "loading") {
             return
@@ -173,7 +172,6 @@ function _useFallback() {
     _backendStatus = "missing"
 }
 
-    // ── Stage 1: cache read ──────────────────────────────────────────────────
     FileView {
         id: cacheReader
         onLoadedChanged: {
@@ -190,7 +188,6 @@ function _useFallback() {
         }
     }
 
-    // ── Stage 2: LRCLib via curl ─────────────────────────────────────────────
     function _fetchFromLrcLib() {
         const url = "https://lrclib.net/api/get"
                   + "?artist_name=" + encodeURIComponent(_artist)
@@ -234,12 +231,6 @@ function _useFallback() {
         }
     }
 
-    // ── Stage 3: cache write ─────────────────────────────────────────────────
-    // We base64-encode the LRC text and decode it on the shell side with a
-    // single `sh -c` invocation. This avoids any Process stdin lifecycle
-    // complexity (no DataStream type exists in Quickshell.Io — write() lives
-    // directly on Process, but coordinating close-then-exit is fragile, so
-    // we sidestep it entirely by passing the payload as an argument).
     function _saveCache(lrcContent) {
         const path = _cacheDir + "/" + _cacheKey(_artist, _title) + ".lrc"
         const b64  = Qt.btoa(lrcContent)

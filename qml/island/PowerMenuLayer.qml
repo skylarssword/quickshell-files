@@ -2,9 +2,6 @@ import QtQuick
 import Quickshell.Io
 import "../shared"
 
-// Power menu island state: lock, sleep, logout, reboot, power,
-// and settings (opens the control panel). Rendered inside the capsule
-// like every other layer (search, control_center, etc), not a popup.
 Item {
     id: root
 
@@ -32,7 +29,6 @@ Item {
         anchors.centerIn: parent
         spacing: 22
 
-        // Lock
         PowerMenuButton {
             glyph: "\uf023"
             iconFontFamily: root.iconFontFamily
@@ -42,7 +38,6 @@ Item {
             }
         }
 
-        // Sleep
         PowerMenuButton {
             glyph: "\uf186"
             iconFontFamily: root.iconFontFamily
@@ -52,7 +47,6 @@ Item {
             }
         }
 
-        // Logout
         PowerMenuButton {
             glyph: "\uf2f5"
             iconFontFamily: root.iconFontFamily
@@ -62,7 +56,6 @@ Item {
             }
         }
 
-        // Reboot
         PowerMenuButton {
             glyph: "\uf021"
             iconFontFamily: root.iconFontFamily
@@ -72,7 +65,6 @@ Item {
             }
         }
 
-        // Shutdown
         PowerMenuButton {
             glyph: "\uf011"
             iconFontFamily: root.iconFontFamily
@@ -83,7 +75,6 @@ Item {
             }
         }
 
-        // Settings / Control Center
         PowerMenuButton {
             glyph: "\uf013"
             iconFontFamily: root.iconFontFamily

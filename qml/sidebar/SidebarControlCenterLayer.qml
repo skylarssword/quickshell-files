@@ -7,13 +7,9 @@ import Quickshell.Io
 import IslandBackend
 import "../shared"
 
-// ── Sidebar Control Center popup — centered, replica of ControlCenterLayer ───
-// Opened by the cog icon below the notification bell in the sidebar pill.
-
 PanelWindow {
     id: root
 
-    // ── Theming ───────────────────────────────────────────────────────
     property bool  useWalColor:         false
     property color walColor:            "#000000"
     property real  capsuleOpacityValue: 0.20
@@ -35,13 +31,11 @@ PanelWindow {
     readonly property color textPrimary:  IslandMotion.textPrimary
     readonly property color textSecondary: IslandMotion.textSecondary
 
-    // ── Open/close ────────────────────────────────────────────────────
     property bool popupOpen: false
     function open()  { popupOpen = true  }
     function close() { popupOpen = false }
     function toggle(){ popupOpen = !popupOpen }
 
-    // ── Signals ───────────────────────────────────────────────────────
     signal dndToggleRequested()
     signal gamemodeToggleRequested()
     signal sidebarToggleRequested()
@@ -61,7 +55,6 @@ PanelWindow {
     readonly property color capsuleWalColor: (capsuleWalColorIndex >= 0 && capsuleWalColorIndex < capsuleWalColors.length)
         ? capsuleWalColors[capsuleWalColorIndex] : "#000000"
 
-    // ── System state ──────────────────────────────────────────────────
     property string currentTime:       "00:00"
     property string currentDateLabel:  ""
     property int    batteryCapacity:   0
@@ -109,7 +102,6 @@ PanelWindow {
     readonly property var wifiNetworks: wifiController ? wifiController.networks : null
     readonly property bool wifiListRunning: wifiController ? wifiController.scanning : false
 
-    // ── Helpers ───────────────────────────────────────────────────────
     function clamp01(v) { return Math.max(0, Math.min(1, v)) }
     function trimString(v) { return (v === undefined || v === null) ? "" : String(v).trim() }
 
@@ -172,7 +164,6 @@ PanelWindow {
         lastAppliedVolume = v; volumeSetterRunning = true; SystemServices.setVolume(v)
     }
 
-    // ── Window setup ──────────────────────────────────────────────────
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     aboveWindows: true
@@ -204,7 +195,6 @@ PanelWindow {
     MouseArea { anchors.fill: parent; enabled: root.popupOpen; onClicked: root.close(); z: -1 }
     Keys.onEscapePressed: root.close()
 
-    // ── Timers ────────────────────────────────────────────────────────
     Timer { id: brightnessApplyTimer; interval: 55; repeat: false; onTriggered: root.flushBrightness(false) }
     Timer { id: volumeApplyTimer;     interval: 55; repeat: false; onTriggered: root.flushVolume(false) }
     Timer {
@@ -216,7 +206,6 @@ PanelWindow {
         }
     }
 
-    // ── Hyprsunset ────────────────────────────────────────────────────
     Process {
         id: hyprsunsetExec
         command: ["bash", "-c", "pgrep -x hyprsunset > /dev/null && pkill -x hyprsunset || hyprsunset --temperature 4500 &"]
@@ -226,20 +215,18 @@ PanelWindow {
         command: ["bash", "-c", "pgrep -x hyprsunset > /dev/null && echo 1 || echo 0"]
         stdout: SplitParser { onRead: (data) => { root.hyprsunsetActive = (data.trim() === "1") } }
     }
-    // Delayed re-check after toggle — gives the process 300 ms to actually start/stop
-    // before querying pgrep, matching how the main ControlCenterLayer does it.
+    
     Timer {
         id: hyprsunsetDelayedCheck
         interval: 300; repeat: false
         onTriggered: if (!hyprsunsetChecker.running) hyprsunsetChecker.running = true
     }
-    // Poll only while the popup is open — no point running when hidden.
+    
     Timer {
         interval: 3000; running: root.popupOpen; repeat: true; triggeredOnStart: true
         onTriggered: if (!hyprsunsetChecker.running) hyprsunsetChecker.running = true
     }
 
-    // ── SystemServices connections ────────────────────────────────────
     Connections {
         target: SystemServices
         function onBrightnessSnapshotReady(value, errorString) {
@@ -298,7 +285,6 @@ PanelWindow {
         NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
     }
 
-    // ── Card ──────────────────────────────────────────────────────────
     Item {
         id: card
         width: 440
@@ -326,7 +312,6 @@ PanelWindow {
             anchors.right: parent.right; anchors.rightMargin: 12
             spacing: 12
 
-            // ── Header row: time + battery ────────────────────────────
             Item {
                 width: parent.width; height: 28
 
@@ -345,7 +330,6 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 4
 
-                    // Charging bolt
                     Text {
                         renderType: Text.NativeRendering
                         text: "\uf0e7"; color: "#7be17b"
@@ -353,7 +337,7 @@ PanelWindow {
                         visible: root.isCharging
                         anchors.verticalCenter: parent.verticalCenter
                     }
-                    // Drawn battery — exact main bar spec: 30×15, r5/r3, tip 3×7
+                    
                     Item {
                         width: 30; height: 15
                         anchors.verticalCenter: parent.verticalCenter
@@ -380,7 +364,7 @@ PanelWindow {
                             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                         }
                     }
-                    // Percentage
+                    
                     Text {
                         renderType: Text.NativeRendering
                         text: root.batteryCapacity + "%"; color: "white"
@@ -388,7 +372,7 @@ PanelWindow {
                         font.weight: Font.DemiBold
                         anchors.verticalCenter: parent.verticalCenter
                     }
-                    // Hyprsunset button
+                    
                     Rectangle {
                         width: 26; height: 26; radius: 13
                         anchors.verticalCenter: parent.verticalCenter
@@ -407,16 +391,16 @@ PanelWindow {
                         MouseArea {
                             id: sunMouse; anchors.fill: parent; hoverEnabled: true
                             onClicked: {
-                                // Optimistically flip UI immediately so it feels instant
+                                
                                 root.hyprsunsetActive = !root.hyprsunsetActive
-                                // Fire the toggle — startDetached so it doesn't block
+                                
                                 hyprsunsetExec.startDetached()
-                                // Re-check after 300 ms to confirm process actually changed
+                                
                                 hyprsunsetDelayedCheck.restart()
                             }
                         }
                     }
-                    // Appearance button
+                    
                     Rectangle {
                         width: 26; height: 26; radius: 13
                         anchors.verticalCenter: parent.verticalCenter
@@ -442,7 +426,6 @@ PanelWindow {
                 }
             }
 
-            // ── Wi-Fi + Bluetooth cards ───────────────────────────────
             Row {
                 width: parent.width; height: 80; spacing: 12
 
@@ -559,7 +542,6 @@ PanelWindow {
                 }
             }
 
-            // ── Game Mode card ────────────────────────────────────────
             Rectangle {
                 width: parent.width; height: 56; radius: 20
                 color: gamemodeHover.containsMouse ? root.moduleHover : root.moduleColor
@@ -612,7 +594,6 @@ PanelWindow {
                 }
             }
 
-            // ── Sidebar toggle card ───────────────────────────────────
             Rectangle {
                 width: parent.width; height: 56; radius: 20
                 color: sidebarHover.containsMouse ? root.moduleHover : root.moduleColor
@@ -674,7 +655,6 @@ PanelWindow {
                 onTriggered: root.close()
             }
 
-            // ── Brightness slider ─────────────────────────────────────
             SidebarSliderCard {
                 id: brightnessSliderCard
                 visible: !root.appearanceMenuOpen
@@ -699,7 +679,6 @@ PanelWindow {
                 onCancelRequested: SystemServices.requestBrightness()
             }
 
-            // ── Volume slider ─────────────────────────────────────────
             SidebarSliderCard {
                 id: volumeSliderCard
                 visible: !root.appearanceMenuOpen
@@ -724,7 +703,6 @@ PanelWindow {
                 onCancelRequested: SystemServices.requestVolume()
             }
 
-            // ── Appearance drawer ─────────────────────────────────────
             Item {
                 id: appearanceMenuDrawer
                 width: parent.width
@@ -751,7 +729,6 @@ PanelWindow {
                         anchors.margins: 14
                         spacing: 10
 
-                        // Header row: label + Pywal switch
                         Item {
                             width: parent.width
                             height: 24
@@ -800,7 +777,6 @@ PanelWindow {
                             }
                         }
 
-                        // Preview pill
                         Rectangle {
                             width: parent.width; height: 40; radius: 14
                             border.width: 1; border.color: Qt.rgba(1,1,1,0.15)
@@ -818,7 +794,6 @@ PanelWindow {
                             }
                         }
 
-                        // Pywal color swatches (only when pywal enabled)
                         Item {
                             width: parent.width
                             height: root.capsuleUseWalColor && root.capsuleWalColors.length > 0 ? 40 : 0
@@ -875,7 +850,6 @@ PanelWindow {
                             }
                         }
 
-                        // Opacity presets
                         Row {
                             anchors.horizontalCenter: parent.horizontalCenter
                             spacing: 6
@@ -910,12 +884,10 @@ PanelWindow {
                             }
                         }
 
-                        // ── Dock section ──────────────────────────────
                         Item { width: parent.width; height: 1
                             Rectangle { anchors.fill: parent; color: Qt.rgba(1,1,1,0.10) }
                         }
 
-                        // Header: "Dock" + enable toggle
                         Item {
                             width: parent.width; height: 24
                             Text {
@@ -958,7 +930,6 @@ PanelWindow {
                             }
                         }
 
-                        // Pin / Smart mode bubbles (only when dock enabled)
                         Grid {
                             width: parent.width
                             columns: 2; rowSpacing: 6; columnSpacing: 6
@@ -1021,7 +992,6 @@ PanelWindow {
             }
         }
 
-    // ── Wi-Fi flyout panel ────────────────────────────────────────────
     Item {
         id: wifiFlyout
         width: 300
@@ -1050,7 +1020,6 @@ PanelWindow {
             anchors.right: parent.right; anchors.rightMargin: 14
             spacing: 8
 
-            // Header
             Row {
                 width: parent.width; spacing: 8
 
@@ -1075,10 +1044,8 @@ PanelWindow {
                 }
             }
 
-            // Divider
             Rectangle { width: parent.width; height: 1; color: Qt.rgba(1,1,1,0.10) }
 
-            // Network list
             Column {
                 width: parent.width
                 spacing: 4
@@ -1148,7 +1115,6 @@ PanelWindow {
                     }
                 }
 
-                // Empty state
                 Text {
                     renderType: Text.NativeRendering
                     width: parent.width; horizontalAlignment: Text.AlignHCenter
@@ -1159,7 +1125,6 @@ PanelWindow {
                 }
             }
 
-            // Wi-Fi off state
             Text {
                 renderType: Text.NativeRendering
                 width: parent.width; horizontalAlignment: Text.AlignHCenter
@@ -1173,7 +1138,6 @@ PanelWindow {
         }
     }
 
-    // ── Bluetooth flyout panel ────────────────────────────────────────
     Item {
         id: btFlyout
         width: 300
@@ -1202,7 +1166,6 @@ PanelWindow {
             anchors.right: parent.right; anchors.rightMargin: 14
             spacing: 8
 
-            // Header
             Row {
                 width: parent.width
                 spacing: 8
@@ -1228,10 +1191,8 @@ PanelWindow {
                 }
             }
 
-            // Divider
             Rectangle { width: parent.width; height: 1; color: Qt.rgba(1,1,1,0.10) }
 
-            // Device list
             Column {
                 width: parent.width
                 spacing: 4
@@ -1291,7 +1252,6 @@ PanelWindow {
                     }
                 }
 
-                // Empty state
                 Text {
                     renderType: Text.NativeRendering
                     width: parent.width; horizontalAlignment: Text.AlignHCenter
@@ -1303,7 +1263,6 @@ PanelWindow {
                 }
             }
 
-            // BT off state
             Text {
                 renderType: Text.NativeRendering
                 width: parent.width; horizontalAlignment: Text.AlignHCenter

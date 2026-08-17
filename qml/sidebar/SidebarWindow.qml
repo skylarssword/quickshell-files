@@ -17,16 +17,13 @@ PanelWindow {
 
     property bool sidebarEnabled: false
 
-    // ── Dock ──────────────────────────────────────────────────────────
     property bool   dockEnabled: false
     property string dockMode:    "pin"
     signal dockEnabledToggleRequested()
     signal dockModeChangeRequested(string mode)
 
-    // ── Gamemode — turns entire sidebar black ─────────────────────────
     property bool gamemodeActive: false
 
-    // ── Pywal / capsule color ─────────────────────────────────────────
     property bool  capsuleUseWalColor:   false
     property var   capsuleWalColors:     []
     property int   capsuleWalColorIndex: 0
@@ -36,14 +33,12 @@ PanelWindow {
         (capsuleWalColorIndex >= 0 && capsuleWalColorIndex < capsuleWalColors.length)
         ? capsuleWalColors[capsuleWalColorIndex] : "#000000"
 
-    // Pill background: if gamemode → pure black; else pywal or plain black at opacity
     readonly property color pillColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (capsuleUseWalColor
             ? Qt.rgba(capsuleWalColor.r, capsuleWalColor.g, capsuleWalColor.b, capsuleOpacityValue)
             : Qt.rgba(0, 0, 0, capsuleOpacityValue))
 
-    // ── Workspace tracking (live, per-monitor) ────────────────────────
     readonly property var hyprMonitor: screen
         ? Hyprland.monitorFor(screen) : Hyprland.focusedMonitor
 
@@ -59,7 +54,6 @@ PanelWindow {
                   .sort((a, b) => a.id - b.id)
     }
 
-    // ── Active window title ───────────────────────────────────────────
     readonly property var focusedClient: {
         if (!Hyprland.toplevels || !Hyprland.toplevels.values) return null
         const all = Hyprland.toplevels.values
@@ -75,7 +69,6 @@ PanelWindow {
         return title.length > 22 ? cls : title
     }
 
-    // ── MPRIS ─────────────────────────────────────────────────────────
     IslandMprisController {
         id: mediaController
         expanded: true
@@ -89,18 +82,15 @@ PanelWindow {
     readonly property string timePlayed:    mediaController.timePlayed
     readonly property string timeTotal:     mediaController.timeTotal
 
-    // ── System state ──────────────────────────────────────────────────
     property int  batteryCapacity:   0
     property bool isCharging:        false
     property real currentVolume:     0.5
     property real currentBrightness: 0.5
 
-    // ── Notifications ─────────────────────────────────────────────────
     property bool   dndActive:          false
     property var    notificationHistory: []
     property int    unreadCount:         0
 
-    // ── Notification sound ────────────────────────────────────────────
     SoundEffect {
         id: notifSound
         source: Quickshell.shellDir + "/qml/shared/assets/sounds/notification.wav"
@@ -127,10 +117,6 @@ PanelWindow {
 
         if (notifWidget.item) notifWidget.item.shake()
 
-        // Play sound if not DND
-        // Sound is handled centrally in shell.qml
-
-        // Kick off async icon lookup — toast will get icon once resolved
         queueNotificationIconLookup(entry.id, entry.appName)
 
         if (root.sidebarEnabled && !root.dndActive)
@@ -190,7 +176,7 @@ PanelWindow {
             next.appIcon = trimmed
             return next
         })
-        // Update toast by appName — entryId isn't tracked there
+        
         if (matchedAppName !== "")
             notifToast.updateIcon(matchedAppName, trimmed)
     }
@@ -221,7 +207,6 @@ PanelWindow {
         + wsOverflow * 23
         + (systraySection.expanded ? systraySection.expandedHeight - systraySection.collapsedHeight : 0)
 
-    // ── Window setup ─────────────────────────────────────────────────
     color: "transparent"
     anchors { top: true; bottom: true; left: true }
     exclusiveZone: root.sidebarEnabled
@@ -231,9 +216,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     implicitWidth: pillWidth + edgeGap * 2
-    // Always keep the window alive so the exclusiveZone can animate back
-    // to -1 before the compositor releases the reserved margin.
-    // The pill uses opacity + Behavior to fade in/out instead.
+    
     visible: true
 
     Behavior on exclusiveZone {
@@ -247,7 +230,6 @@ PanelWindow {
         height: root.sidebarEnabled ? Math.ceil(sidePill.height) : 0
     }
 
-    // ── IPC: same target as main bar, guards on sidebarEnabled ───────
     IpcHandler {
         target: "tide-sidebar"
 
@@ -282,7 +264,6 @@ PanelWindow {
         }
     }
 
-    // ── Settings polling — reads appearance-settings.json like main bar ─
     Process {
         id: settingsQuery
         property string _buf: ""
@@ -311,8 +292,6 @@ PanelWindow {
         onTriggered: if (!settingsQuery.running && !root._skipRead) settingsQuery.running = true
     }
 
-    // ── Gamemode polling — same file as DynamicIslandWindow ───────────
-    // ~/.config/ml4w/settings/gamemode-enabled exists → gamemode ON
     Process {
         id: gamemodePollQuery
         property string _buf: ""
@@ -331,7 +310,6 @@ PanelWindow {
         onTriggered: if (!gamemodePollQuery.running) gamemodePollQuery.running = true
     }
 
-    // ── Pywal polling ─────────────────────────────────────────────────
     Process {
         id: walColorQuery
         property string _buf: ""
@@ -357,9 +335,6 @@ PanelWindow {
         onTriggered: if (!walColorQuery.running) walColorQuery.running = true
     }
 
-    // ── Appearance persistence ────────────────────────────────────────
-    // Skip one poll cycle after a local write so we don't read our own
-    // write back before DynamicIslandWindow has had a chance to see it.
     property bool _skipRead: false
 
     Process { id: appearanceSaveExec }
@@ -403,13 +378,11 @@ PanelWindow {
         onTriggered: root._skipRead = false
     }
 
-    // ── Workspace dispatch ────────────────────────────────────────────
     HyprlandDispatch {
         id: wsDispatch
         function go(id) { focusWorkspace(String(id)) }
     }
 
-    // ── Popup windows ─────────────────────────────────────────────────
     SidebarAppLauncher {
         id: appLauncher
         gamemodeActive:      root.gamemodeActive
@@ -582,20 +555,18 @@ PanelWindow {
             root.capsuleOpacityValue = value
             root.saveAppearanceSettings()
         }
-        // Dock — forward signals up to SidebarWindow so shell.qml can wire them
+        
         dockEnabled: root.dockEnabled
         dockMode:    root.dockMode
         onDockEnabledToggleRequested: root.dockEnabledToggleRequested()
         onDockModeChangeRequested:    function(mode) { root.dockModeChangeRequested(mode) }
     }
 
-    // Runs gamemode.sh so the file toggle matches DynamicIslandWindow's keybind
     Process {
         id: gamemodeToggleExec
         command: ["bash", "-c", "~/.config/hypr/scripts/gamemode.sh"]
     }
 
-    // ── Pill ─────────────────────────────────────────────────────────
     Rectangle {
         id: sidePill
         anchors.left:           parent.left
@@ -614,7 +585,6 @@ PanelWindow {
         opacity: root.sidebarEnabled ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: IslandMotion.durationMedium; easing.type: Easing.OutCubic } }
 
-        // ── Fixed top block (app launcher + divider) ─────────────────
         Column {
             id: topBlock
             anchors.top:              parent.top
@@ -622,7 +592,6 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: 10
 
-            // ── App launcher button ──────────────────────────────────
             Item {
                 width: root.pillWidth; height: root.pillWidth
                 Image {
@@ -648,7 +617,6 @@ PanelWindow {
                 }
             }
 
-            // ── Divider ──────────────────────────────────────────────
             Rectangle {
                 width: 20; height: 1
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -656,7 +624,6 @@ PanelWindow {
             }
         }
 
-        // ── Workspace dots — only this grows/shrinks ──────────────────
         Item {
             id: wsMiddle
             anchors.top:              topBlock.bottom
@@ -706,7 +673,6 @@ PanelWindow {
             }
         }
 
-        // ── Fixed lower block (window title, music, clock, battery) ──
         Column {
             id: lowerBlock
             anchors.bottom:           bottomSection.top
@@ -714,7 +680,6 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: 10
 
-            // ── Active window title — always constant height ───────────
             Item {
                 width:   root.pillWidth
                 height:  70
@@ -738,7 +703,6 @@ PanelWindow {
                 }
             }
 
-            // ── Divider (only when window title showing) ──────────────
             Rectangle {
                 width: 20; height: 1
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -747,7 +711,6 @@ PanelWindow {
                 Behavior on opacity { NumberAnimation { duration: IslandMotion.fast } }
             }
 
-            // ── Music widget ─────────────────────────────────────────
             SidebarMusicWidget {
                 anchors.horizontalCenter: parent.horizontalCenter
                 pillWidth:      root.pillWidth
@@ -764,14 +727,12 @@ PanelWindow {
                 }
             }
 
-            // ── Divider ──────────────────────────────────────────────
             Rectangle {
                 width: 20; height: 1
                 anchors.horizontalCenter: parent.horizontalCenter
                 color: IslandMotion.surfaceBorderColor
             }
 
-            // ── Clock ────────────────────────────────────────────────
             SidebarClockWidget {
                 anchors.horizontalCenter: parent.horizontalCenter
                 pillWidth:      root.pillWidth
@@ -787,7 +748,6 @@ PanelWindow {
                 }
             }
 
-            // ── Battery ───────────────────────────────────────────────
             Item {
                 width: root.pillWidth; height: 32
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -798,7 +758,6 @@ PanelWindow {
                     width: 13; height: 26
                     anchors.centerIn: parent
 
-                    // Nub on top
                     Rectangle {
                         width: 6; height: 3; radius: 1
                         color: Qt.rgba(1,1,1,0.70)
@@ -806,7 +765,6 @@ PanelWindow {
                         anchors.top: parent.top
                     }
 
-                    // Outer shell
                     Rectangle {
                         id: battShell
                         anchors.left: parent.left; anchors.right: parent.right
@@ -819,7 +777,6 @@ PanelWindow {
                         border.width: 1.5
                         Behavior on border.color { ColorAnimation { duration: 300 } }
 
-                        // Fill bar — rises from bottom
                         Rectangle {
                             anchors.left: parent.left; anchors.right: parent.right
                             anchors.bottom: parent.bottom
@@ -833,7 +790,6 @@ PanelWindow {
                             Behavior on color  { ColorAnimation  { duration: 300 } }
                         }
 
-                        // Charging bolt overlay
                         Text {
                             renderType: Text.NativeRendering
                             anchors.centerIn: parent
@@ -847,7 +803,6 @@ PanelWindow {
             }
         }
 
-        // ── Bottom section (always pinned to bottom of pill) ──────────
         Column {
             id: bottomSection
             anchors.bottom:           parent.bottom
@@ -855,7 +810,6 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: 10
 
-            // ── Notification bell ─────────────────────────────────────
             Loader {
                 id: notifWidget
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -879,7 +833,6 @@ PanelWindow {
                 }
             }
 
-            // ── Cog / Control Center button ───────────────────────────
             SidebarControlCenterWidget {
                 anchors.horizontalCenter: parent.horizontalCenter
                 pillWidth:      root.pillWidth
@@ -898,7 +851,6 @@ PanelWindow {
                 }
             }
 
-            // ── Power button ──────────────────────────────────────────
             SidebarPowerWidget {
                 anchors.horizontalCenter: parent.horizontalCenter
                 pillWidth:      root.pillWidth
@@ -917,7 +869,6 @@ PanelWindow {
                 }
             }
 
-            // ── Systray expander ──────────────────────────────────────
             SidebarSystraySection {
                 id: systraySection
                 anchors.horizontalCenter: parent.horizontalCenter

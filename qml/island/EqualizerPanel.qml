@@ -6,33 +6,17 @@ import Quickshell.Services.Mpris
 import IslandBackend
 import "../shared"
 
-// EqualizerPanel — fully self-contained EQ view with two pages:
-//   Page 1 (default): original equalizer with Flat/Bass/Treble/... presets
-//   Page 2 (custom):  10 numbered slots, tap to load/select, edit sliders,
-//                      Save writes current sliders into the selected slot,
-//                      Reset clears the selected slot back to flat.
-// Tapping the album art swaps between the two pages.
-//
-// DECOUPLING NOTE: this component polls its own MPRIS state and runs its own
-// equalizer.sh process calls. It does NOT read from ExpandedPlayerLayer,
-// IslandMprisController, or LyricManager. If this file breaks, nothing else
-// in the shell is affected.
-
 Item {
     id: root
 
     property bool showCondition: false
     property string iconFontFamily: ""
     property string textFontFamily: ""
-    // Set true when embedded in SidebarMusicPopup — disables the album art
-    // page toggle (no art visible there) and adjusts top margin to clear
-    // the ‹ back button that floats above the panel.
+    
     property bool sidebarMode: false
 
-    // ── Page state ───────────────────────────────────────────────────────────
     property bool customPageActive: false
 
-    // ── Independent MPRIS polling (own copy, not shared with anything) ──────
     property var _playersList: Mpris.players.values !== undefined ? Mpris.players.values : Mpris.players
     property var _activePlayer: {
         if (!_playersList || _playersList.length === 0) return null
@@ -51,9 +35,6 @@ Item {
         return "/usr/share/tide-island/qml/island/equalizer.sh"
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // PAGE 1 STATE — original equalizer (unchanged behavior)
-    // ═══════════════════════════════════════════════════════════════════════
     property var bandValues: [0,0,0,0,0,0,0,0,0,0]
     property string currentPreset: "Flat"
     property bool pendingChanges: false
@@ -123,7 +104,7 @@ Item {
                 root.pendingChanges = !!data.pending
                 root.loaded = true
             } catch(e) {
-                // Leave defaults in place; this panel degrades gracefully on its own.
+                
             }
         }
     }
@@ -132,13 +113,10 @@ Item {
     Process { id: applyProc }
     Process { id: presetProc }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // PAGE 2 STATE — custom numbered slots
-    // ═══════════════════════════════════════════════════════════════════════
     property var customBandValues: [0,0,0,0,0,0,0,0,0,0]
     property int selectedSlot: 1
-    property var customSlotsFilled: ({})   // { "1": true, "3": true, ... }
-    property bool customSlotDirty: false   // true once sliders edited since last load/save
+    property var customSlotsFilled: ({})   
+    property bool customSlotDirty: false   
 
     function refreshCustomSlotsList() {
         getCustomSlotsProc.command = ["bash", scriptPath, "get_custom_slots"]
@@ -151,7 +129,6 @@ function selectSlot(slot) {
         getCustomSlotProc.command = ["bash", scriptPath, "get_custom_slot", String(slot)]
         getCustomSlotProc.running = true
 
-        // Selecting a slot also applies it live immediately.
         loadCustomLiveProc.command = ["bash", scriptPath, "load_custom", String(slot)]
         loadCustomLiveProc.running = true
     }
@@ -228,7 +205,6 @@ function selectSlot(slot) {
         if (customPageActive) _onCustomPageOpened()
     }
 
-    // ── UI ───────────────────────────────────────────────────────────────────
     anchors.fill: parent
     anchors.topMargin:    sidebarMode ? 48 : 20
     anchors.leftMargin:   sidebarMode ? 8  : 20
@@ -240,21 +216,16 @@ function selectSlot(slot) {
         NumberAnimation { duration: showCondition ? 280 : 120; easing.type: Easing.InOutQuad }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // PAGE 1 — original equalizer (Flat / Bass / Treble / ...)
-    // ═══════════════════════════════════════════════════════════════════════
     Column {
         id: page1
         anchors.fill: parent
         spacing: 12
         visible: !root.customPageActive
 
-        // ── Sliders row — full width in sidebar, art+sliders in main island ──
         Item {
             width: parent.width
             height: parent.height - bottomRow.height - parent.spacing
 
-            // Album art (main island only — tap to switch to custom page)
             Item {
                 id: artColumn
                 visible: !root.sidebarMode
@@ -400,7 +371,6 @@ function selectSlot(slot) {
             width: parent.width
             height: 28
 
-            // Draggable scrolling preset list
             ListView {
                 id: presetListView
                 anchors.left: parent.left
@@ -447,7 +417,6 @@ function selectSlot(slot) {
                 height: parent.height
                 spacing: 6
 
-                // Custom slots button
                 Rectangle {
                     width: 58; height: parent.height; radius: height / 2
                     color: customPageBtnMouse.containsMouse ? Qt.rgba(1,1,1,0.18) : Qt.rgba(1,1,1,0.08)
@@ -473,7 +442,6 @@ function selectSlot(slot) {
                     }
                 }
 
-                // Apply button
                 Rectangle {
                     id: applyButton
                     width: 58; height: parent.height; radius: height / 2
@@ -500,9 +468,6 @@ function selectSlot(slot) {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // PAGE 2 — custom numbered slots, full width sliders
-    // ═══════════════════════════════════════════════════════════════════════
     Column {
         id: page2
         anchors.fill: parent
@@ -610,7 +575,6 @@ function selectSlot(slot) {
                 }
             }
 
-            // Bottom row — ‹ Presets on left, slots in middle, Reset+Save on right
         }
 
         Item {
@@ -618,7 +582,6 @@ function selectSlot(slot) {
             width: parent.width
             height: 28
 
-            // ‹ Presets back button
             Rectangle {
                 id: backToPresetsBtn
                 anchors.left: parent.left
@@ -648,7 +611,6 @@ function selectSlot(slot) {
                 }
             }
 
-            // Numbered slot pills — centered between back button and action buttons
             Row {
                 id: slotRow
                 anchors.left: backToPresetsBtn.right

@@ -26,7 +26,7 @@ Rectangle {
     onNotificationPulseToggleChanged: {
         if (!root.dndActive) {
             bellWobble.restart()
-            // Sound is handled centrally in shell.qml
+            
         }
     }
 
@@ -38,7 +38,7 @@ Rectangle {
 
     property bool expanded: false
     readonly property string archGlyph: "󰣇"
-    // bell glyphs replaced by SVGs — see assets/notification.svg and notification-off.svg
+    
     readonly property string packageGlyph: "\uf487"
 
     readonly property int glyphSlotWidth: 38
@@ -125,7 +125,6 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         spacing: root.trayIconSpacing
 
-        // ── Expandable tray: updates + real tray icons ─────────────────
         Row {
             id: trayRow
             spacing: root.trayIconSpacing
@@ -135,7 +134,6 @@ Rectangle {
 
             Behavior on opacity { NumberAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeOut } }
 
-            // ── Update count ──────────────────────────────────────────────
             Item {
                 width: updatesRow.implicitWidth
                 height: root.trayIconSize
@@ -379,13 +377,8 @@ Rectangle {
             }
         }
 
-        // ── Divider between tray section and arch — only when expanded ──
         Divider { visible: root.expanded }
 
-        // ── Chevron expand/collapse trigger — flips when tray opens ────
-        // Pointing right (›) at rest → points left (‹) when expanded,
-        // matching mugen-shell's chevron-double-right / chevron-double-left.
-        // We use a single glyph and rotate 180° so the flip is animated.
         Item {
             id: archIconItem
             width: root.glyphSlotWidth
@@ -401,7 +394,6 @@ Rectangle {
                 sourceSize: Qt.size(28, 28)
                 fillMode: Image.PreserveAspectFit
 
-                // Flip 180° when tray is open — same as mugen-shell's left/right swap
                 rotation: root.expanded ? 180 : 0
 
                 opacity: archMouse.containsMouse ? 1.0 : 0.7
@@ -425,7 +417,6 @@ Rectangle {
 
         Divider {}
 
-        // ── Notification / DND toggle ───────────────────────────────────
         Item {
             id: notificationIconItem
             width: root.glyphSlotWidth
@@ -501,7 +492,6 @@ Rectangle {
 
         Divider {}
 
-        // ── Power / arch logo — pinned to the far right ─────────────────
         Item {
             id: powerIconItem
             width: root.glyphSlotWidth

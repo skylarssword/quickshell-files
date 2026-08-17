@@ -81,7 +81,7 @@ readonly property color capsuleWalColor: (capsuleWalColorIndex >= 0 && capsuleWa
         : "#000000"
     property bool appearanceSettingsLoaded: false
     property bool   dockEnabled: true
-    property string dockMode:    "pin"   // "pin" | "smart"
+    property string dockMode:    "pin"   
 
 onCapsuleOpacityChanged:       if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
     onCapsuleUseWalColorChanged:   if (appearanceSettingsLoaded && !_pollReading) appearanceSettingsSaveTimer.restart()
@@ -609,9 +609,6 @@ Timer {
         }
     }
 
-    // When this is true, property changes triggered by a JSON read must NOT
-    // re-trigger the save timer — otherwise DynamicIslandWindow would
-    // immediately overwrite whatever SidebarWindow just wrote.
     property bool _pollReading: false
 
     Process {
@@ -627,7 +624,7 @@ Timer {
                 if (raw.length > 0) {
                     try {
                         const parsed = JSON.parse(raw)
-                        // On first load only, restore our own appearance settings
+                        
                         if (!root.appearanceSettingsLoaded) {
                             root._pollReading = true
                             if (typeof parsed.mainBar_capsuleOpacity === "number")
@@ -648,7 +645,7 @@ Timer {
                                 root.idleMode = parsed.idleMode
                             root._pollReading = false
                         }
-                        // Always sync sidebarEnabled so toggling from sidebar is reflected here
+                        
                         if (typeof parsed.sidebarEnabled === "boolean")
                             root.sidebarEnabled = parsed.sidebarEnabled
                     } catch (e) {
@@ -661,7 +658,6 @@ Timer {
         }
     }
 
-    // Poll only for sidebarEnabled changes — appearance keys are owned by this window
     Timer {
         id: sidebarSyncTimer
         interval: 500; repeat: true; running: true; triggeredOnStart: false
@@ -771,7 +767,7 @@ property string mediaPlayerName: ""
                     const c = clients[i]
                     const cls = String(c.class || "").toLowerCase()
                     const title = String(c.title || "").toLowerCase()
-                    // ytm runs inside kitty — match by title containing "ytm"
+                    
                     const isYtm = title.indexOf("ytm") >= 0
                     const isSpotify = cls.indexOf("spotify") >= 0
                     if (isYtm || isSpotify || cls.indexOf(needle) >= 0 || needle.indexOf(cls) >= 0

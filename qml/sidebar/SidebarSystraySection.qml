@@ -4,10 +4,6 @@ import Quickshell.Io
 import Quickshell.Services.SystemTray
 import "../shared"
 
-// Vertical replica of SystrayBubble's fold-out mechanic.
-// The chevron arrow (rotated chevron-double-left) sits at the top;
-// tapping it expands the section downward revealing tray icons + package count.
-
 Item {
     id: root
 
@@ -16,7 +12,6 @@ Item {
     property string textFontFamily: "sans-serif"
     property bool   gamemodeActive: false
 
-    // How tall the expanded tray content is — parent reads this to grow the pill.
     readonly property real collapsedHeight: toggleBtn.height
     readonly property real expandedHeight:  toggleBtn.height + trayContent.implicitHeight + 8
 
@@ -34,7 +29,6 @@ Item {
         NumberAnimation { duration: IslandMotion.standard; easing.type: IslandMotion.easeArrive }
     }
 
-    // ── Updates query (same as SystrayBubble) ────────────────────────
     Process {
         id: updatesQuery
         property string _buf: ""
@@ -59,7 +53,6 @@ Item {
         onTriggered: { if (!updatesQuery.running) updatesQuery.running = true }
     }
 
-    // ── Chevron toggle button ─────────────────────────────────────────
     Item {
         id: toggleBtn
         width:  root.pillWidth
@@ -74,7 +67,6 @@ Item {
             sourceSize: Qt.size(40, 40)
             fillMode: Image.PreserveAspectFit
 
-            // Rest = pointing up (270°), expanded = pointing down (90°)
             rotation: root.expanded ? 90 : 270
 
             opacity: chevronMouse.containsMouse ? 1.0 : 0.60
@@ -94,7 +86,6 @@ Item {
         }
     }
 
-    // ── Divider ───────────────────────────────────────────────────────
     Rectangle {
         anchors.top: toggleBtn.bottom
         anchors.horizontalCenter: parent.horizontalCenter
@@ -104,7 +95,6 @@ Item {
         Behavior on opacity { NumberAnimation { duration: IslandMotion.fast } }
     }
 
-    // ── Tray content (expands downward) ──────────────────────────────
     Column {
         id: trayContent
         anchors.top:              toggleBtn.bottom
@@ -116,7 +106,6 @@ Item {
         visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeOut } }
 
-        // ── Package count ─────────────────────────────────────────────
         Item {
             width: root.pillWidth
             height: root.trayIconSize + 4
@@ -162,7 +151,6 @@ Item {
             }
         }
 
-        // ── Tray icons ────────────────────────────────────────────────
         Repeater {
             id: trayRepeater
             model: SystemTray.items
@@ -173,13 +161,12 @@ Item {
                 height: root.trayIconSize
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                // ── Context menu popup ────────────────────────────────
                 PopupWindow {
                     id: menuPopup
                     visible: false
                     color: "transparent"
                     anchor.item: trayIconDelegate
-                    // open to the right of the pill
+                    
                     anchor.rect.x: root.pillWidth + 8
                     anchor.rect.y: 0
                     implicitWidth: 200
@@ -300,7 +287,6 @@ Item {
                     }
                 }
 
-                // ── Tray icon image ───────────────────────────────────
                 Image {
                     id: trayIcon
                     anchors.fill: parent
@@ -318,7 +304,6 @@ Item {
                     Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 }
 
-                // Fallback letter if no image
                 Rectangle {
                     anchors.fill: parent
                     color: "transparent"
@@ -353,7 +338,6 @@ Item {
             }
         }
 
-        // Bottom padding
         Item { width: 1; height: 4 }
     }
 }

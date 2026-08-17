@@ -11,11 +11,9 @@ Item {
     property string textFontFamily: "Inter Display"
     property string iconFontFamily: "JetBrainsMono Nerd Font"
 
-    // ── Tab state ──────────────────────────────────────────────────────────
     property int activeTab: 0
     signal requestClose()
 
-    // ── Weather state ──────────────────────────────────────────────────────
     property real   tempF:        0
     property string weatherDesc:  ""
     property int    weatherCode:  -1
@@ -35,7 +33,6 @@ Item {
     property real   geoLon: 0
     property string citySearch: ""
 
-    // ── Calendar state ─────────────────────────────────────────────────────
     property int calMonth: new Date().getMonth()
     property int calYear:  new Date().getFullYear()
     property int todayD:   new Date().getDate()
@@ -64,7 +61,6 @@ Item {
         }
     }
 
-    // ── WMO helpers ────────────────────────────────────────────────────────
     function wmoIcon(code, day) {
         if (code === 0)  return day ? "☀" : "☾"
         if (code <= 2)   return "⛅"
@@ -93,7 +89,6 @@ Item {
         return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(dateStr + "T12:00:00").getDay()]
     }
 
-    // ── Processes ──────────────────────────────────────────────────────────
     Process {
         id: ipGeoProc
         command: ["curl", "-sf", "--max-time", "5", "http://ip-api.com/json/?fields=city,lat,lon,status"]
@@ -194,7 +189,6 @@ Item {
         }
     }
 
-    // ── Clipboard state ────────────────────────────────────────────────────
     property string clipSearch: ""
     property string clipHoveredId: ""
     property string clipHoveredPreview: ""
@@ -296,7 +290,6 @@ stdout: SplitParser {
         }
     }
 
-    // ── Notes (tide-notes) state ───────────────────────────────────────────
     property bool   tideNotesLoaded:  false
     property bool   tideNotesLoading: false
     property bool   tideNotesDirty:   false
@@ -350,7 +343,6 @@ stdout: SplitParser {
         onTriggered: { tideNotesWriteProc.write(root.tideNotesContent); root.tideNotesDirty = false }
     }
 
-    // ── Todo state ─────────────────────────────────────────────────────────
     ListModel { id: tideTodoModel }
     property bool tideTodosLoaded: false
 
@@ -397,7 +389,6 @@ stdout: SplitParser {
         tideTodosWriteProc.write(lines.join("\n"))
     }
 
-    // ── Lifecycle ──────────────────────────────────────────────────────────
     Component.onCompleted: {
         updateCalendar(calYear, calMonth)
         loadCity(root.citySearch)
@@ -413,7 +404,6 @@ onShowConditionChanged: {
         }
     }
 
-    // ── UI ─────────────────────────────────────────────────────────────────
     anchors.fill: parent
     opacity: showCondition ? 1 : 0
     Behavior on opacity {
@@ -426,7 +416,6 @@ onShowConditionChanged: {
         }
     }
 
-    // ── TAB BAR ────────────────────────────────────────────────────────────
 Row {
         id: tabBar
         anchors.top: parent.top
@@ -483,14 +472,10 @@ MouseArea {
         }
     }
 
-    // ── TAB CONTENT ────────────────────────────────────────────────────────
     Item {
         anchors.fill: parent
         anchors.topMargin: 44
 
-        // ══════════════════════════════════════════════════════════════════
-        // TAB 0 — WEATHER + CALENDAR (original layout, untouched)
-        // ══════════════════════════════════════════════════════════════════
         Item {
             anchors.fill: parent
             visible: root.activeTab === 0
@@ -501,7 +486,6 @@ MouseArea {
                 anchors.topMargin: 10
                 spacing: 16
 
-        // ── LEFT: Weather ──────────────────────────────────────────────────
         Item {
             width: parent.width * 0.42
             height: parent.height
@@ -510,7 +494,6 @@ MouseArea {
                 anchors.fill: parent
                 spacing: 6
 
-                // City + search
                 Row {
                     width: parent.width
                     spacing: 6
@@ -542,7 +525,6 @@ MouseArea {
                     }
                 }
 
-                // Search input
                 Rectangle {
                     width: parent.width
                     height: 22
@@ -578,7 +560,6 @@ onAccepted: {
                     }
                 }
 
-                // Big temp + icon
                 Row {
                     width: parent.width
                     spacing: 8
@@ -616,7 +597,6 @@ onAccepted: {
                     }
                 }
 
-                // Stats row
                 Row {
                     width: parent.width
                     spacing: 10
@@ -651,7 +631,6 @@ onAccepted: {
                     }
                 }
 
-                // 5-day forecast
                 Column {
                     width: parent.width
                     spacing: 3
@@ -753,14 +732,12 @@ onAccepted: {
             }
         }
 
-        // ── DIVIDER ────────────────────────────────────────────────────────
         Rectangle {
             width: 1
             height: parent.height
             color: Qt.rgba(1, 1, 1, 0.12)
         }
 
-        // ── RIGHT: Calendar ────────────────────────────────────────────────
         Item {
             width: parent.width - parent.width * 0.42 - 17
             height: parent.height
@@ -769,7 +746,6 @@ onAccepted: {
                 anchors.fill: parent
                 spacing: 6
 
-                // Month nav
                 Row {
                     width: parent.width
 
@@ -820,7 +796,6 @@ onAccepted: {
                     }
                 }
 
-                // Day headers
                 Row {
                     width: parent.width
                     Repeater {
@@ -839,7 +814,6 @@ onAccepted: {
                     }
                 }
 
-               // Calendar grid
                 Grid {
                     columns: 7
                     width: parent.width
@@ -872,18 +846,15 @@ onAccepted: {
                         }
                     }
                 }
-                // end Grid
+                
             }
-            // end Calendar Column
+            
         }
-        // end Calendar Item
+        
     }
-    // end Weather+Calendar Row
-} // end Tab 0 Item
+    
+} 
 
-        // ══════════════════════════════════════════════════════════════════
-        // TAB 1 — CLIPBOARD
-        // ══════════════════════════════════════════════════════════════════
         Item {
             anchors.fill: parent
             visible: root.activeTab === 1
@@ -893,7 +864,6 @@ onAccepted: {
                 anchors.margins: 20
                 spacing: 0
 
-                // ── PREVIEW PANE ───────────────────────────────────────────
                 Item {
                     id: clipPreviewPane
                     width: root.clipHoveredId !== "" ? parent.width * 0.45 : 0
@@ -922,7 +892,6 @@ onAccepted: {
                             font.pixelSize: 11; font.family: root.textFontFamily; font.weight: Font.Bold
                         }
 
-                        // Text preview
                         Rectangle {
                             width: parent.width; height: parent.height - 30
                             visible: !root.clipHoveredIsImage
@@ -963,7 +932,6 @@ onAccepted: {
                             }
                         }
 
-                        // Image preview
                         Rectangle {
                             width: parent.width; height: parent.height - 30
                             visible: root.clipHoveredIsImage
@@ -996,7 +964,6 @@ onAccepted: {
                     }
                 }
 
-                // Divider between preview and list
                 Rectangle {
                     width: root.clipHoveredId !== "" ? 1 : 0
                     height: parent.height
@@ -1004,7 +971,6 @@ onAccepted: {
                     Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutExpo } }
                 }
 
-                // ── LIST PANE ──────────────────────────────────────────────
                 Item {
                     width: parent.width - clipPreviewPane.width - (root.clipHoveredId !== "" ? 1 : 0)
                     height: parent.height
@@ -1013,7 +979,6 @@ onAccepted: {
                         anchors.fill: parent
                         spacing: 10
 
-                        // Header row
                         Row {
                             width: parent.width
                             spacing: 0
@@ -1048,7 +1013,6 @@ onAccepted: {
                             }
                         }
 
-                       // Search bar
                         Rectangle {
                             width: parent.width; height: 28; radius: 14
                             color: Qt.rgba(1,1,1,0.08)
@@ -1086,7 +1050,6 @@ onAccepted: {
                             }
                         }
 
-                        // Empty state
                         Item {
                             width: parent.width; height: 80
                             visible: clipModel.count === 0
@@ -1105,7 +1068,6 @@ onAccepted: {
                             }
                         }
 
-                        // Clip list
                         ListView {
                             id: clipListView
                             width: parent.width
@@ -1206,9 +1168,6 @@ onAccepted: {
             }
         }
 
-        // ══════════════════════════════════════════════════════════════════
-        // TAB 2 — NOTES
-        // ══════════════════════════════════════════════════════════════════
         Item {
             anchors.fill: parent
             visible: root.activeTab === 2
@@ -1219,7 +1178,6 @@ onAccepted: {
                 anchors.topMargin: 6
                 spacing: 10
 
-                // Header
                 Row {
                     width: parent.width; spacing: 0
 
@@ -1240,7 +1198,6 @@ onAccepted: {
                     }
                 }
 
-                // Editor
                 Rectangle {
                     width: parent.width
                     height: parent.height - 80
@@ -1289,7 +1246,6 @@ onAccepted: {
                     }
                 }
 
-                // Footer buttons
                 Row {
                     width: parent.width; spacing: 8
 
@@ -1328,14 +1284,10 @@ onAccepted: {
 
                     Item { width: parent.width - 80; height: 1 }
 
-		
                 }
             }
         }
 
-        // ══════════════════════════════════════════════════════════════════
-        // TAB 3 — TODO
-        // ══════════════════════════════════════════════════════════════════
         Item {
             anchors.fill: parent
             visible: root.activeTab === 3
@@ -1346,7 +1298,6 @@ onAccepted: {
                 anchors.topMargin: 6
                 spacing: 10
 
-                // Header
                 Row {
                     width: parent.width
 
@@ -1373,7 +1324,6 @@ onAccepted: {
                     }
                 }
 
- // Add input
                 Rectangle {
                     width: parent.width; height: 32; radius: 16
                     color: Qt.rgba(1,1,1,0.08)
@@ -1418,7 +1368,6 @@ onAccepted: {
                     }
                 }
 
-                // Empty state
                 Item {
                     width: parent.width; height: 60
                     visible: tideTodoModel.count === 0
@@ -1437,7 +1386,6 @@ onAccepted: {
                     }
                 }
 
-                // Task list
                 ScrollView {
                     width: parent.width
                     height: parent.height - 140
@@ -1471,7 +1419,6 @@ onAccepted: {
                                     anchors.leftMargin: 10; anchors.rightMargin: 8
                                     spacing: 8
 
-                                    // Checkbox
                                     Rectangle {
                                         width: 18; height: 18; radius: 9
                                         anchors.verticalCenter: parent.verticalCenter
@@ -1525,7 +1472,6 @@ onAccepted: {
                     }
                 }
 
-                // Footer actions
                 Row {
                     width: parent.width
                     visible: tideTodoModel.count > 0
@@ -1565,5 +1511,5 @@ onAccepted: {
             }
         }
 
-    } // end tab content Item
-} // end root Item
+    } 
+} 

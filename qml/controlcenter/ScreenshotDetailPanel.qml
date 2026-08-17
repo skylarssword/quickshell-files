@@ -69,7 +69,6 @@ Process {
         anchors.fill: parent
         spacing: 12
 
-        // ── Header ─────────────────────────────────────────────────────────
         Row {
             width: parent.width
             spacing: 0
@@ -108,7 +107,6 @@ Process {
             }
         }
 
-        // ── Mode picker ────────────────────────────────────────────────────
         Column {
             width: parent.width
             spacing: 6
@@ -170,7 +168,6 @@ Process {
             }
         }
 
-        // ── Delay picker ───────────────────────────────────────────────────
         Column {
             width: parent.width
             spacing: 6
@@ -222,7 +219,6 @@ Process {
             }
         }
 
-        // ── Capture button ─────────────────────────────────────────────────
         Rectangle {
             width: parent.width; height: 44; radius: 14
             color: captureBtnMouse.containsMouse ? Qt.rgba(1,1,1,0.22) : Qt.rgba(1,1,1,0.14)
@@ -255,7 +251,6 @@ Process {
             }
         }
 
-        // ── Recent screenshots ─────────────────────────────────────────────
         Column {
             width: parent.width
             spacing: 6
@@ -292,16 +287,16 @@ MouseArea {
 Item {
                 width: parent.width
                 height: panel.height
-                       - 28        // header
-                       - 12        // spacing
-                       - 72        // mode picker column
+                       - 28        
+                       - 12        
+                       - 72        
                        - 12
-                       - 52        // delay picker column
+                       - 52        
                        - 12
-                       - 44        // capture btn
+                       - 44        
                        - 12
-                       - 28        // recent header row
-                       - 12        // spacing
+                       - 28        
+                       - 12        
                        - 6
                 clip: true
 
@@ -336,7 +331,6 @@ ListView {
                             event.accepted = true
                         }
                     }
-
 
                     delegate: Rectangle {
                         required property int index

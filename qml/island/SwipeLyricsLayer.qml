@@ -45,9 +45,7 @@ property int recordingDotSpacing: -5
 readonly property real artSize: 26
     readonly property real artSpacing: 8
 readonly property real artReserved: (currentArtUrl !== "" && lyricMostlyVisible) ? artSize + artSpacing : 0
-    // Used for width sizing rather than artReserved directly, since at rest
-    // (the state preferredWidth is computed for) the lyrics are fully visible
-    // anyway — this avoids a circular dependency on the settled width.
+    
     readonly property real artReservedForWidth: currentArtUrl !== "" ? artSize + artSpacing : 0
 readonly property real cavaReserved: lyricMostlyVisible
     ? cavaBars.implicitWidth + artSpacing
@@ -188,7 +186,6 @@ OpacityMask {
             border.color: IslandMotion.surfaceBorderColor
         }
     }
-    
     
     SwipeCavaBars {
         id: cavaBars
@@ -374,11 +371,6 @@ delegate: Item {
                                         menu: modelData.hasChildren ? modelData : null
                                     }
 
-                                    // Submenu renders as its own popup window, anchored
-                                    // beside this item, rather than expanding inline —
-                                    // inline expansion required the outer Column to grow
-                                    // exactly in sync with async-loaded submenu content,
-                                    // which drifted out of sync and caused overlap.
                                     PopupWindow {
                                         id: submenuPopup
                                         visible: false
