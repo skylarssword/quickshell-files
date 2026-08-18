@@ -26,7 +26,7 @@ warnings.filterwarnings("ignore", category=PyGIDeprecationWarning)
 
 CACHE_DIR = os.path.join(
     os.environ.get("XDG_CACHE_HOME", os.path.join(os.path.expanduser("~"), ".cache")),
-    "mugen-shell"
+    "tide-island-search-apps"
 )
 CACHE_JSON = os.path.join(CACHE_DIR, "apps_v4.json")
 CACHE_SIG = os.path.join(CACHE_DIR, "apps_v4.sha256")
