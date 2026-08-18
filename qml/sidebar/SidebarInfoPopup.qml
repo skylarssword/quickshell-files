@@ -197,8 +197,8 @@ PanelWindow {
     WlrLayershell.keyboardFocus: popupOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     visible: popupOpen
 
-    readonly property real cardW: 640
-    readonly property real cardH: 320
+    readonly property real cardW: 690
+    readonly property real cardH: 380
 
     mask: Region {
         Region {
