@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 680 680">
+  <title>Shore T logo</title>
+  <desc>A flowing handwritten T with curled tail — Shore logo</desc>
+  <g transform="translate(340,340) rotate(-20) translate(-340,-340)" stroke="white" stroke-width="66" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M 220 290 C 260 270, 308 258, 345 260 C 380 262, 420 272, 455 265"/>
+    <path d="M 340 262 C 336 308, 330 355, 328 395 C 326 422, 329 442, 340 456 C 351 470, 368 477, 390 473 C 412 468, 425 452, 422 437"/>
+  </g>
+</svg>

@@ -26,7 +26,6 @@ Rectangle {
     onNotificationPulseToggleChanged: {
         if (!root.dndActive) {
             bellWobble.restart()
-            
         }
     }
 
@@ -38,7 +37,6 @@ Rectangle {
 
     property bool expanded: false
     readonly property string archGlyph: "󰣇"
-    
     readonly property string packageGlyph: "\uf487"
 
     readonly property int glyphSlotWidth: 38
@@ -125,6 +123,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         spacing: root.trayIconSpacing
 
+        // ── Expandable tray: updates + real tray icons ─────────────────
         Row {
             id: trayRow
             spacing: root.trayIconSpacing
@@ -134,6 +133,7 @@ Rectangle {
 
             Behavior on opacity { NumberAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeOut } }
 
+            // ── Update count ──────────────────────────────────────────────
             Item {
                 width: updatesRow.implicitWidth
                 height: root.trayIconSize
@@ -377,8 +377,10 @@ Rectangle {
             }
         }
 
+        // ── Divider between tray section and arch — only when expanded ──
         Divider { visible: root.expanded }
 
+        // ── Chevron expand/collapse trigger — flips when tray opens ────
         Item {
             id: archIconItem
             width: root.glyphSlotWidth
@@ -417,6 +419,7 @@ Rectangle {
 
         Divider {}
 
+        // ── Notification / DND toggle ───────────────────────────────────
         Item {
             id: notificationIconItem
             width: root.glyphSlotWidth
@@ -492,6 +495,7 @@ Rectangle {
 
         Divider {}
 
+        // ── Power / arch logo — pinned to the far right ─────────────────
         Item {
             id: powerIconItem
             width: root.glyphSlotWidth
@@ -507,7 +511,6 @@ Rectangle {
                 color: IslandMotion.textPrimary
                 opacity: powerMouse.containsMouse ? 1.0 : 0.7
                 scale: powerMouse.containsMouse ? 1.15 : (powerMouse.pressed ? 0.82 : 1.0)
-
                 Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             }

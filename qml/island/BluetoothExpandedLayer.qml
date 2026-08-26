@@ -11,6 +11,23 @@ Item {
     property string iconFontFamily: ""
     property string textFontFamily: ""
 
+    signal volumeChangeRequested(real value)
+
+    property real _pendingVolume: -1
+
+    Timer {
+        id: volumeDebounce
+        interval: 40
+        repeat: false
+        onTriggered: if (root._pendingVolume >= 0) root.volumeChangeRequested(root._pendingVolume)
+    }
+
+    function _seekVolume(trackX) {
+        const clamped = Math.max(0, Math.min(volumeTrack.width, trackX))
+        root._pendingVolume = clamped / volumeTrack.width
+        volumeDebounce.restart()
+    }
+
     readonly property string deviceName: {
         if (!device) return "Bluetooth device";
 
@@ -235,6 +252,15 @@ Item {
                             easing.type: Easing.OutCubic
                         }
                     }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -10
+                    enabled: root.volumeAvailable
+                    preventStealing: true
+                    onPressed: (mouse) => root._seekVolume(mouse.x)
+                    onPositionChanged: (mouse) => { if (pressed) root._seekVolume(mouse.x) }
                 }
             }
         }

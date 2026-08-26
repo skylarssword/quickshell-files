@@ -10,6 +10,7 @@ Item {
 
 signal connectivityPanelRequested(string kind, bool open)
     signal screenshotPanelRequested(bool open)
+    signal bluetoothExpandRequested()
 signal clearNotificationHistoryRequested()
     signal notificationEntryActivated(var entry)
 signal dndToggleRequested()
@@ -1615,6 +1616,11 @@ Rectangle {
                         id: bluetoothCardMouse
                         anchors.fill: parent
                         hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: function(mouse) {
+                            if (mouse.button === Qt.RightButton)
+                                controlCenter.bluetoothExpandRequested()
+                        }
                     }
 
                     Text {

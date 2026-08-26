@@ -723,6 +723,35 @@ property string notificationAppName: ""
         property string notificationSummary: ""
         property string notificationBody: ""
         property var bluetoothExpandedDevice: null
+        property bool bluetoothExpandedPinned: false
+
+        Timer {
+            id: btFromCCTimer
+            interval: 80
+            repeat: false
+            property var pendingDevice: null
+            onTriggered: {
+                const device = pendingDevice
+                pendingDevice = null
+                if (device) {
+                    islandContainer.smartRestoreState()
+                    btFromCCShowTimer.pendingDevice = device
+                    btFromCCShowTimer.restart()
+                }
+            }
+        }
+
+        Timer {
+            id: btFromCCShowTimer
+            interval: 80
+            repeat: false
+            property var pendingDevice: null
+            onTriggered: {
+                const device = pendingDevice
+                pendingDevice = null
+                if (device) islandContainer.showBluetoothExpandedFromCC(device)
+            }
+        }
 property var notificationHistory: []
         property int notificationHistoryCounter: 0
 property int unseenNotificationCount: 0
@@ -1196,6 +1225,7 @@ Keys.onPressed: (event) => {
             notificationSummary = "";
             notificationBody = "";
             bluetoothExpandedDevice = null;
+            bluetoothExpandedPinned = false;
         }
 
         function cleanNotificationText(text) {
@@ -1612,7 +1642,21 @@ function toggleDnd() {
             islandState = "bluetooth_expanded";
             mainCapsule.displayedWidth = mainCapsule.baseTargetWidth;
             expandedByPlayerAutoOpen = false;
-            restartAutoHideTimer(bluetoothExpandedAutoHideInterval);
+            if (!bluetoothExpandedPinned)
+                restartAutoHideTimer(bluetoothExpandedAutoHideInterval);
+        }
+
+        function showBluetoothExpandedFromCC(device) {
+            if (!device || root.overviewVisible) return;
+            cancelSideSwipeSettle();
+            abortSideTransientMode();
+            clearTransientCapsule();
+            bluetoothExpandedDevice = device;
+            bluetoothExpandedPinned = true;
+            islandState = "bluetooth_expanded";
+            mainCapsule.displayedWidth = mainCapsule.baseTargetWidth;
+            expandedByPlayerAutoOpen = false;
+            // no auto-hide timer — stays open until user dismisses
         }
 
         function showControlCenter() {
@@ -2411,10 +2455,20 @@ activePlayer: islandContainer.activePlayer
                     BluetoothExpandedLayer {
                         device: islandContainer.bluetoothExpandedDevice
                         volumeLevel: islandContainer.currentVolume
-                        iconText: ""
+                        iconText: {
+                            const d = islandContainer.bluetoothExpandedDevice
+                            if (!d) return ""
+                            const n = String(d.deviceName || d.name || "").toLowerCase()
+                            const hw = ["bud","ear","pod","headphone","headset","airpod","jabra","freebuds","tune","studio","solo","over-ear","in-ear"]
+                            for (const w of hw) { if (n.includes(w)) return "\uf025" }
+                            return ""
+                        }
                         iconFontFamily: root.iconFontFamily
                         textFontFamily: root.textFontFamily
                         showCondition: islandContainer.bluetoothExpandedLayerVisible
+                        onVolumeChangeRequested: function(value) {
+                            SystemServices.setVolume(value)
+                        }
                     }
                 }
             }
@@ -2595,6 +2649,12 @@ sidebarEnabled: root.sidebarEnabled
                                 root.screenshotDetailOpen = false
                                 screenshotDetailCleanupTimer.restart()
                             }
+                        }
+                        onBluetoothExpandRequested: {
+                            const connected = bluetoothConnectionTracker.connectedDevices()
+                            if (connected.length === 0) return
+                            btFromCCTimer.pendingDevice = connected[0]
+                            btFromCCTimer.restart()
                         }
                     }
                 }
