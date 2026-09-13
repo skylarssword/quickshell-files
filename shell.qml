@@ -210,6 +210,7 @@ Scope {
 
     property real _lastVolume: -1
     property real _lastBrightness: -1
+    property bool _lastMuted: false
 
     Connections {
         target: SysBackend
@@ -217,8 +218,12 @@ Scope {
         function onVolumeChanged(volPercentage, isMuted) {
             if (!shellRoot.sidebarActive) return
             const level = volPercentage / 100.0
-            if (Math.abs(level - shellRoot._lastVolume) < 0.01 && shellRoot._lastVolume >= 0) return
+            const unchanged = shellRoot._lastVolume >= 0
+                && Math.abs(level - shellRoot._lastVolume) < 0.01
+                && shellRoot._lastMuted === isMuted
+            if (unchanged) return
             shellRoot._lastVolume = level
+            shellRoot._lastMuted = isMuted
             const instances = osdVariants.instances ?? []
             for (let i = 0; i < instances.length; i++)
                 if (instances[i]) instances[i].showVolume(level, isMuted)
