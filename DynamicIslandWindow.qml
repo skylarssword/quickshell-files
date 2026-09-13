@@ -2691,11 +2691,13 @@ sidebarEnabled: root.sidebarEnabled
                         textFontFamily: root.textFontFamily
                         notificationHistory: islandContainer.notificationHistory
                         showCondition: islandContainer.notificationCenterLayerVisible
+                        dndActive: islandContainer.dndActive
                         onClearRequested: islandContainer.clearNotificationHistory()
                         onCloseRequested: islandContainer.smartRestoreState()
                         onDismissRequested: function(entryId) {
                             islandContainer.dismissNotificationFromHistory(entryId)
                         }
+                        onDndToggleRequested: islandContainer.toggleDnd()
                     }
                 }
             }

@@ -10,12 +10,14 @@ Item {
     property var notificationHistory: []
     property bool showCondition: true
     property int expandedIndex: -1
+    property bool dndActive: false
 
     readonly property int contentHeight: 92 + Math.max(1, notificationHistory.length) * 64
 
     signal clearRequested()
     signal closeRequested()
     signal dismissRequested(int entryId)
+    signal dndToggleRequested()
 
     onNotificationHistoryChanged: {
         if (notificationHistory.length === 0)
@@ -52,6 +54,28 @@ Item {
         }
 
         Rectangle {
+            id: dndBtn
+            anchors.top: parent.top
+            anchors.right: clearBellBtn.left
+            anchors.rightMargin: 8
+            width: 30; height: 30; radius: 15
+            color: dndMouse.pressed ? Qt.rgba(0.36,0.22,0.7,0.30)
+                 : (dndMouse.containsMouse ? Qt.rgba(1,1,1,0.12) : Qt.rgba(1,1,1,0.08))
+            border.width: 1
+            border.color: root.dndActive ? Qt.rgba(0.6,0.4,1.0,0.7)
+                        : (dndMouse.containsMouse ? Qt.rgba(1,1,1,0.4) : Qt.rgba(1,1,1,0.2))
+            Behavior on color { ColorAnimation { duration: 120 } }
+            Text {
+                renderType: Text.NativeRendering
+                anchors.centerIn: parent; text: "\uf186"
+                font.family: root.iconFontFamily; font.pixelSize: 13
+                color: root.dndActive ? Qt.rgba(0.7,0.5,1.0,0.95) : IslandMotion.textPrimary
+            }
+            MouseArea { id: dndMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.dndToggleRequested() }
+        }
+
+        Rectangle {
+            id: clearBellBtn
             anchors.top: parent.top
             anchors.right: parent.right
             width: 30; height: 30; radius: 15

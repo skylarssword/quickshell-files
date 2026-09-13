@@ -612,7 +612,10 @@ PanelWindow {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         appLauncher.toggle()
-                        if (appLauncher.launcherOpen) musicPopup.close()
+                        if (appLauncher.launcherOpen) {
+                            musicPopup.close()
+                            controlCenter.close()
+                        }
                     }
                 }
             }
@@ -723,6 +726,7 @@ PanelWindow {
                     if (musicPopup.popupOpen) {
                         appLauncher.close()
                         infoPopup.close()
+                        controlCenter.close()
                     }
                 }
             }

@@ -15,25 +15,6 @@ PanelWindow {
     property real   capsuleOpacityValue: 0.20
     property bool   gamemodeActive:      false
 
-    Process {
-        id: gamemodeCheck
-        command: ["bash", "-c",
-            "[ -f \"$HOME/.config/ml4w/settings/gamemode-enabled\" ] && echo 1 || echo 0"]
-        property string _buf: ""
-        stdout: SplitParser { onRead: gamemodeCheck._buf += data }
-        onRunningChanged: {
-            if (!running) {
-                root.gamemodeActive = gamemodeCheck._buf.trim() === "1"
-                gamemodeCheck._buf = ""
-            }
-        }
-    }
-
-    Timer {
-        interval: 3000; running: true; repeat: true; triggeredOnStart: true
-        onTriggered: if (!gamemodeCheck.running) gamemodeCheck.running = true
-    }
-
     readonly property color bgColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor

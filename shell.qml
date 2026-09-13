@@ -203,6 +203,11 @@ Scope {
     property bool   capsuleUseWalColor: false
     property color  capsuleWalColor:    "#000000"
 
+    property real   sidebarCapsuleOpacity:     0.20
+    property bool   sidebarCapsuleUseWalColor: false
+    property color  sidebarCapsuleWalColor:    "#000000"
+    property bool   sidebarGamemodeActive:     false
+
     property real _lastVolume: -1
     property real _lastBrightness: -1
 
@@ -278,6 +283,10 @@ Scope {
             dockMode:    shellRoot.dockMode
             onDockEnabledToggleRequested: shellRoot.dockEnabled = !shellRoot.dockEnabled
             onDockModeChangeRequested:    function(mode) { shellRoot.dockMode = mode }
+            onCapsuleOpacityValueChanged: if (shellRoot.sidebarCapsuleOpacity !== capsuleOpacityValue) shellRoot.sidebarCapsuleOpacity = capsuleOpacityValue
+            onCapsuleUseWalColorChanged:  if (shellRoot.sidebarCapsuleUseWalColor !== capsuleUseWalColor) shellRoot.sidebarCapsuleUseWalColor = capsuleUseWalColor
+            onCapsuleWalColorChanged:     if (shellRoot.sidebarCapsuleWalColor !== capsuleWalColor) shellRoot.sidebarCapsuleWalColor = capsuleWalColor
+            onGamemodeActiveChanged:      if (shellRoot.sidebarGamemodeActive !== gamemodeActive) shellRoot.sidebarGamemodeActive = gamemodeActive
         }
     }
 
@@ -290,6 +299,10 @@ Scope {
             screen: modelData
             textFontFamily: shellRoot.userConfig.textFontFamily
             iconFontFamily: shellRoot.userConfig.iconFontFamily
+            gamemodeActive:      shellRoot.sidebarGamemodeActive
+            useWalColor:         shellRoot.sidebarCapsuleUseWalColor
+            walColor:            shellRoot.sidebarCapsuleWalColor
+            capsuleOpacityValue: shellRoot.sidebarCapsuleOpacity
         }
     }
 
