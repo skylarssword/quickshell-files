@@ -2825,7 +2825,7 @@ SystrayBubble {
 
 Item {
             id: dndBubble
-            readonly property bool shouldShow: !root.bubblesEnabled && islandContainer.dndBubbleVisible
+            readonly property bool shouldShow: !root.bubblesEnabled && !root.idleMode && islandContainer.dndBubbleVisible
             property bool mounted: false
             property real reveal: 0
 readonly property int bubbleSize: 26
