@@ -28,6 +28,10 @@ signal bubblesToggleRequested()
     property bool   dockEnabled: true
     signal dockModeChangeRequested(string mode)
     property string dockMode: "pin"
+    onDockModeChanged: {
+        if (dockMode === "bump") smartCardFlipped = true
+        else if (dockMode === "smart") smartCardFlipped = false
+    }
     signal idleModeToggleRequested(bool enabled)
     property bool idleMode: false
     signal sidebarToggleRequested()
@@ -36,6 +40,7 @@ signal bubblesToggleRequested()
     property string lastBubbleMode: "bar"
     property bool appearanceMenuOpen: false
     property bool gamemodeCardFlipped: false
+    property bool smartCardFlipped: false
     property real capsuleOpacity: 0.20
     property bool capsuleUseWalColor: false
     property var capsuleWalColors: []
@@ -3369,15 +3374,17 @@ Rectangle {
                         }
 
                         Rectangle {
+                            id: smartBumpCard
                             width:   (parent.width - 6) / 2
                             height:  controlCenter.dockEnabled ? 36 : 0
                             opacity: controlCenter.dockEnabled ? 1 : 0
                             clip: true
                             radius: 12
-                            readonly property bool isActive: controlCenter.dockEnabled && controlCenter.dockMode === "smart"
+                            readonly property bool isActive: controlCenter.dockEnabled
+                                && ((!controlCenter.smartCardFlipped && controlCenter.dockMode === "smart") || (controlCenter.smartCardFlipped && controlCenter.dockMode === "bump"))
                             color:  isActive
                                     ? Qt.rgba(1,1,1,0.15)
-                                    : (smartBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
+                                    : (smartBumpMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
                             border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
                             Behavior on height       { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
@@ -3385,23 +3392,72 @@ Rectangle {
                             Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                            Text {
-                                renderType:       Text.NativeRendering
-                                anchors.centerIn: parent
-                                text:  "Smart"
-                                color: parent.isActive ? "white" : Qt.rgba(1,1,1,0.45)
-                                font.pixelSize: 12
-                                font.family:    controlCenter.textFontFamily
-                                font.weight:    parent.isActive ? Font.DemiBold : Font.Normal
-                                Behavior on color { ColorAnimation { duration: 150 } }
+                            transform: Rotation {
+                                id: smartFlipRotation
+                                origin.x: smartBumpCard.width / 2
+                                origin.y: smartBumpCard.height / 2
+                                axis { x: 0; y: 1; z: 0 }
+                                angle: controlCenter.smartCardFlipped ? 180 : 0
+                                Behavior on angle {
+                                    NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
+                                }
+                            }
+
+                            Item {
+                                anchors.fill: parent
+                                visible: smartFlipRotation.angle < 90
+                                Text {
+                                    renderType:       Text.NativeRendering
+                                    anchors.centerIn: parent
+                                    text:  "Smart"
+                                    color: (controlCenter.dockEnabled && controlCenter.dockMode === "smart") ? "white" : Qt.rgba(1,1,1,0.45)
+                                    font.pixelSize: 12
+                                    font.family:    controlCenter.textFontFamily
+                                    font.weight:    (controlCenter.dockEnabled && controlCenter.dockMode === "smart") ? Font.DemiBold : Font.Normal
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+                            }
+
+                            Item {
+                                anchors.fill: parent
+                                visible: smartFlipRotation.angle >= 90
+                                transform: Rotation {
+                                    origin.x: smartBumpCard.width / 2
+                                    origin.y: smartBumpCard.height / 2
+                                    axis { x: 0; y: 1; z: 0 }
+                                    angle: 180
+                                }
+                                Text {
+                                    renderType:       Text.NativeRendering
+                                    anchors.centerIn: parent
+                                    text:  "Bump"
+                                    color: (controlCenter.dockEnabled && controlCenter.dockMode === "bump") ? "white" : Qt.rgba(1,1,1,0.45)
+                                    font.pixelSize: 12
+                                    font.family:    controlCenter.textFontFamily
+                                    font.weight:    (controlCenter.dockEnabled && controlCenter.dockMode === "bump") ? Font.DemiBold : Font.Normal
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
                             }
 
                             MouseArea {
-                                id: smartBubbleMouse
+                                id: smartBumpMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape:  Qt.PointingHandCursor
-                                onClicked:    controlCenter.dockModeChangeRequested("smart")
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: (mouse) => {
+                                    if (mouse.button === Qt.RightButton) {
+                                        controlCenter.smartCardFlipped = !controlCenter.smartCardFlipped
+                                    } else {
+                                        const targetMode = controlCenter.smartCardFlipped ? "bump" : "smart"
+                                        if (controlCenter.dockEnabled && controlCenter.dockMode === targetMode) {
+                                            controlCenter.dockEnabledToggleRequested()
+                                        } else {
+                                            controlCenter.dockModeChangeRequested(targetMode)
+                                            if (!controlCenter.dockEnabled) controlCenter.dockEnabledToggleRequested()
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

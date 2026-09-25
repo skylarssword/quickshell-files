@@ -25,7 +25,9 @@ PanelWindow {
     readonly property int edgePad:  14
     readonly property int iconGap:  8
 
-    exclusiveZone: 0
+    exclusiveZone: root.dockEnabled && root.dockMode === "bump" && !root.activeWindowFullscreen
+        ? (root.pillH + 10 + (root.gamemodeActive ? 10 : 0))
+        : 0
     aboveWindows:  true
     color:         "transparent"
     anchors { bottom: true; left: true; right: true }
@@ -52,6 +54,7 @@ PanelWindow {
             : Qt.rgba(0, 0, 0, root.capsuleOpacity))
 
     property bool anyWindowOpen: false
+    property bool activeWindowFullscreen: false
 
     Process {
         id: windowCountQuery
@@ -60,20 +63,26 @@ PanelWindow {
         stdout: SplitParser { onRead: windowCountQuery._buf += data + "\n" }
         onRunningChanged: {
             if (!running) {
-                try { root.anyWindowOpen = (JSON.parse(windowCountQuery._buf).windows|0) > 0 } catch(e) {}
+                try {
+                    const parsed = JSON.parse(windowCountQuery._buf)
+                    root.anyWindowOpen = (parsed.windows|0) > 0
+                    root.activeWindowFullscreen = !!parsed.hasfullscreen
+                } catch(e) {}
                 windowCountQuery._buf = ""
             }
         }
     }
     Timer {
         interval: 700; repeat: true; triggeredOnStart: true
-        running: root.dockMode === "smart" && root.dockEnabled
+        running: (root.dockMode === "smart" || root.dockMode === "bump") && root.dockEnabled
         onTriggered: if (!windowCountQuery.running) windowCountQuery.running = true
     }
 
     readonly property bool pillActuallyVisible:
         root.dockEnabled
-        && (root.dockMode === "pin" || !root.anyWindowOpen || root.hoverPeeking)
+        && (root.dockMode === "pin"
+            || (root.dockMode === "bump" && (!root.activeWindowFullscreen || root.hoverPeeking))
+            || (root.dockMode === "smart" && (!root.anyWindowOpen || root.hoverPeeking)))
 
     property bool hoverPeeking: false
 

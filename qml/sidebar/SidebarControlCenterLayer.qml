@@ -51,6 +51,11 @@ PanelWindow {
     property var  capsuleWalColors:   []
     property bool dockEnabled: false
     property string dockMode:  "pin"
+    property bool smartCardFlipped: false
+    onDockModeChanged: {
+        if (dockMode === "bump") smartCardFlipped = true
+        else if (dockMode === "smart") smartCardFlipped = false
+    }
     property int  capsuleWalColorIndex: 0
     readonly property color capsuleWalColor: (capsuleWalColorIndex >= 0 && capsuleWalColorIndex < capsuleWalColors.length)
         ? capsuleWalColors[capsuleWalColorIndex] : "#000000"
@@ -963,27 +968,79 @@ PanelWindow {
                             }
 
                             Rectangle {
+                                id: sbSmartBumpCard
                                 width: (parent.width - 6) / 2; height: 36; radius: 12
-                                color: root.dockEnabled && root.dockMode === "smart"
+                                clip: true
+                                readonly property bool isActive: root.dockEnabled
+                                    && ((!root.smartCardFlipped && root.dockMode === "smart") || (root.smartCardFlipped && root.dockMode === "bump"))
+                                color: isActive
                                     ? Qt.rgba(1,1,1,0.15)
-                                    : (sbSmartMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
-                                border.color: root.dockEnabled && root.dockMode === "smart"
-                                    ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
+                                    : (sbSmartBumpMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
+                                border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                                 border.width: 1
                                 Behavior on color        { ColorAnimation { duration: 150 } }
                                 Behavior on border.color { ColorAnimation { duration: 150 } }
-                                Text {
-                                    renderType: Text.NativeRendering; anchors.centerIn: parent
-                                    text: "Smart"
-                                    color: (root.dockEnabled && root.dockMode === "smart") ? "white" : Qt.rgba(1,1,1,0.45)
-                                    font.pixelSize: 12; font.family: root.textFontFamily
-                                    font.weight: (root.dockEnabled && root.dockMode === "smart") ? Font.DemiBold : Font.Normal
-                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                transform: Rotation {
+                                    id: sbSmartFlipRotation
+                                    origin.x: sbSmartBumpCard.width / 2
+                                    origin.y: sbSmartBumpCard.height / 2
+                                    axis { x: 0; y: 1; z: 0 }
+                                    angle: root.smartCardFlipped ? 180 : 0
+                                    Behavior on angle {
+                                        NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
+                                    }
                                 }
+
+                                Item {
+                                    anchors.fill: parent
+                                    visible: sbSmartFlipRotation.angle < 90
+                                    Text {
+                                        renderType: Text.NativeRendering; anchors.centerIn: parent
+                                        text: "Smart"
+                                        color: (root.dockEnabled && root.dockMode === "smart") ? "white" : Qt.rgba(1,1,1,0.45)
+                                        font.pixelSize: 12; font.family: root.textFontFamily
+                                        font.weight: (root.dockEnabled && root.dockMode === "smart") ? Font.DemiBold : Font.Normal
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                }
+
+                                Item {
+                                    anchors.fill: parent
+                                    visible: sbSmartFlipRotation.angle >= 90
+                                    transform: Rotation {
+                                        origin.x: sbSmartBumpCard.width / 2
+                                        origin.y: sbSmartBumpCard.height / 2
+                                        axis { x: 0; y: 1; z: 0 }
+                                        angle: 180
+                                    }
+                                    Text {
+                                        renderType: Text.NativeRendering; anchors.centerIn: parent
+                                        text: "Bump"
+                                        color: (root.dockEnabled && root.dockMode === "bump") ? "white" : Qt.rgba(1,1,1,0.45)
+                                        font.pixelSize: 12; font.family: root.textFontFamily
+                                        font.weight: (root.dockEnabled && root.dockMode === "bump") ? Font.DemiBold : Font.Normal
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                }
+
                                 MouseArea {
-                                    id: sbSmartMouse; anchors.fill: parent
+                                    id: sbSmartBumpMouse; anchors.fill: parent
                                     hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.dockModeChangeRequested("smart")
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: (mouse) => {
+                                        if (mouse.button === Qt.RightButton) {
+                                            root.smartCardFlipped = !root.smartCardFlipped
+                                        } else {
+                                            const targetMode = root.smartCardFlipped ? "bump" : "smart"
+                                            if (root.dockEnabled && root.dockMode === targetMode) {
+                                                root.dockEnabledToggleRequested()
+                                            } else {
+                                                root.dockModeChangeRequested(targetMode)
+                                                if (!root.dockEnabled) root.dockEnabledToggleRequested()
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
