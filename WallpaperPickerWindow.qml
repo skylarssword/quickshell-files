@@ -13,6 +13,10 @@ PanelWindow {
 
     property bool pickerVisible: false
     readonly property string iconFontFamily: UserConfig.iconFontFamily
+    property bool gridMode: false
+    property string gridSearchText: ""
+    property int gridSelectedIndex: 0
+    property int popBucketIndex: -1
 
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
@@ -46,6 +50,10 @@ PanelWindow {
                 staticScanner.running = true
                 videoScanner.running  = true
             }
+        } else {
+            gridMode = false
+            gridSearchText = ""
+            gridSearchInput.text = ""
         }
     }
 
@@ -128,7 +136,8 @@ PanelWindow {
         interval: 50; repeat: false
         onTriggered: {
             focusScope.forceActiveFocus()
-            carousel.forceActiveFocus()
+            if (root.gridMode) gridSearchInput.forceActiveFocus()
+            else carousel.forceActiveFocus()
         }
     }
 
@@ -155,6 +164,13 @@ PanelWindow {
         else if (mediaFilter === "video") base = base.filter(p =>  root.isVideo(p))
         if (selectedBucket === "all") return base
         return base.filter(p => bucketFor(colorMap[p]) === selectedBucket)
+    }
+
+    property var gridFilteredWallpapers: {
+        let base = filteredWallpapers
+        let q = gridSearchText.trim().toLowerCase()
+        if (q === "") return base
+        return base.filter(p => p.split("/").pop().toLowerCase().includes(q))
     }
 
     function cycleMediaFilter() {
@@ -398,20 +414,32 @@ PanelWindow {
         else root.setStaticWallpaper(path)
     }
 
+    function applyGridSelected() {
+        if (root.gridSelectedIndex < 0 || root.gridSelectedIndex >= root.gridFilteredWallpapers.length) return
+        let path = root.gridFilteredWallpapers[root.gridSelectedIndex]
+        if (root.isVideo(path)) root.setVideoWallpaper(path)
+        else root.setStaticWallpaper(path)
+    }
+
     function applyRandom() {
-        let list = root.filteredWallpapers
+        let list = root.gridMode ? root.gridFilteredWallpapers : root.filteredWallpapers
         if (list.length === 0) return
         let idx = Math.floor(Math.random() * list.length)
-        carousel.currentIndex = idx
+        if (root.gridMode) {
+            root.gridSelectedIndex = idx
+        } else {
+            carousel.currentIndex = idx
+        }
         let path = list[idx]
         if (root.isVideo(path)) root.setVideoWallpaper(path)
         else root.setStaticWallpaper(path)
     }
 
-    readonly property int cellWidth:       1100  
-    readonly property int cellHeight:      440   
-    readonly property int skew:            70    
+    readonly property int cellWidth:       1100
+    readonly property int cellHeight:      440
     readonly property int bottomBarHeight: 64
+    readonly property int searchBarHeight: 52
+    readonly property int gridCellSize:    200
 
     Rectangle {
         id: backdrop
@@ -430,10 +458,135 @@ PanelWindow {
         FocusScope {
             id: focusScope
             anchors.fill: parent
-            focus: root.pickerVisible       
+            focus: root.pickerVisible
             activeFocusOnTab: false
 
-            Keys.onEscapePressed: root.pickerVisible = false
+            Keys.onEscapePressed: {
+                if (root.gridMode && gridSearchInput.activeFocus && gridSearchInput.text.length > 0) {
+                    gridSearchInput.text = ""
+                    root.gridSearchText = ""
+                } else if (root.gridMode) {
+                    root.gridMode = false
+                    carousel.forceActiveFocus()
+                } else {
+                    root.pickerVisible = false
+                }
+            }
+
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_G && !gridSearchInput.activeFocus) {
+                    root.gridMode = !root.gridMode
+                    gridTogglePop.restart()
+                    if (root.gridMode) {
+                        gridSearchInput.forceActiveFocus()
+                        root.gridSelectedIndex = 0
+                    } else {
+                        carousel.forceActiveFocus()
+                    }
+                    event.accepted = true
+                }
+            }
+
+            Item {
+                id: searchBar
+                anchors {
+                    left: parent.left; right: parent.right
+                    top: parent.top
+                }
+                height: root.gridMode ? root.searchBarHeight : 0
+                visible: root.gridMode
+                clip: true
+
+                Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+                Rectangle {
+                    anchors {
+                        left: parent.left; right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: 24; rightMargin: 24
+                    }
+                    height: 38
+                    color: Qt.rgba(1,1,1,0.08)
+                    border.color: Qt.rgba(1,1,1,0.18)
+                    border.width: 1
+                    radius: 10
+
+                    Row {
+                        anchors {
+                            left: parent.left; right: parent.right
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: 12; rightMargin: 12
+                        }
+                        spacing: 8
+
+                        Text {
+                            renderType: Text.NativeRendering
+                            text: "\uf002"
+                            font.family: root.iconFontFamily
+                            font.pixelSize: 14
+                            color: "white"; opacity: 0.5
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        TextInput {
+                            id: gridSearchInput
+                            renderType: TextInput.NativeRendering
+                            width: parent.parent.width - 60
+                            height: 38
+                            color: "white"
+                            font.pixelSize: 14
+                            font.family: UserConfig.textFontFamily
+                            verticalAlignment: TextInput.AlignVCenter
+                            activeFocusOnPress: true
+                            clip: true
+
+                            onTextChanged: {
+                                root.gridSearchText = text
+                                root.gridSelectedIndex = 0
+                            }
+
+                            Keys.onReturnPressed: root.applyGridSelected()
+                            Keys.onTabPressed: {
+                                root.cycleMediaFilter(); mediaFilterPop.restart()
+                            }
+
+                            Keys.onPressed: (event) => {
+                                if (event.key === Qt.Key_R && (event.modifiers & Qt.ControlModifier)) {
+                                    root.applyRandom(); randomButtonPop.restart(); event.accepted = true
+                                }
+                            }
+
+                            Text {
+                                renderType: Text.NativeRendering
+                                anchors.fill: parent
+                                verticalAlignment: Text.AlignVCenter
+                                text: "Search wallpapers\u2026"
+                                color: "white"; opacity: 0.25
+                                font.pixelSize: 14
+                                font.family: UserConfig.textFontFamily
+                                visible: gridSearchInput.text.length === 0
+                            }
+                        }
+
+                        Text {
+                            renderType: Text.NativeRendering
+                            text: "\uf00d"
+                            font.family: root.iconFontFamily
+                            font.pixelSize: 12
+                            color: "white"
+                            opacity: clearSearchMouse.containsMouse ? 0.7 : 0.3
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: gridSearchInput.text.length > 0
+                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                            MouseArea {
+                                id: clearSearchMouse
+                                anchors.fill: parent; hoverEnabled: true
+                                onClicked: { gridSearchInput.text = ""; gridSearchInput.forceActiveFocus() }
+                            }
+                        }
+                    }
+                }
+            }
 
             ListView {
                 id: carousel
@@ -442,12 +595,14 @@ PanelWindow {
                     top: parent.top
                     bottom: bottomBar.top
                 }
-                visible: root.filteredWallpapers.length > 0
+                visible: opacity > 0.01
+                opacity: !root.gridMode && root.filteredWallpapers.length > 0 ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 model: root.filteredWallpapers.length
                 orientation: ListView.Horizontal
                 spacing: -620
                 clip: false
-                focus: true                 
+                focus: !root.gridMode
 
                 highlightFollowsCurrentItem: true
                 highlightMoveDuration: 280
@@ -463,15 +618,16 @@ PanelWindow {
                 Keys.onLeftPressed:   if (currentIndex > 0)          currentIndex--
                 Keys.onRightPressed:  if (currentIndex < count - 1)  currentIndex++
                 Keys.onReturnPressed: root.applySelected()
-                Keys.onTabPressed:    root.cycleMediaFilter()
+                Keys.onTabPressed: { root.cycleMediaFilter(); mediaFilterPop.restart() }
 
                 readonly property var bucketKeyOrder: ["all","red","orange","yellow","green","blue","purple","pink","mono"]
                 Keys.onPressed: (event) => {
-                    if (event.key === Qt.Key_R) { root.applyRandom(); event.accepted = true; return }
+                    if (event.key === Qt.Key_R) { root.applyRandom(); randomButtonPop.restart(); event.accepted = true; return }
                     if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
                         const idx = event.key - Qt.Key_1
                         if (idx < carousel.bucketKeyOrder.length) {
                             root.selectedBucket = carousel.bucketKeyOrder[idx]
+                            root.popBucketIndex = idx
                             event.accepted = true
                         }
                     }
@@ -494,7 +650,7 @@ PanelWindow {
                 delegate: Item {
                     id: cell
                     width: root.cellWidth
-                    height: carousel.height      
+                    height: carousel.height
 
                     required property int index
                     property bool   isCurrent:          ListView.isCurrentItem
@@ -517,32 +673,23 @@ PanelWindow {
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.verticalCenter:   parent.verticalCenter
                         width:  root.cellWidth - 12
-                        height: root.cellHeight          
+                        height: root.cellHeight
 
                         scale:   cell.cardScale
                         opacity: cell.cardOpacity
                         Behavior on scale   { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
                         Behavior on opacity { NumberAnimation { duration: 240 } }
 
-                        Canvas {
-                            id: mask
-                            anchors.fill: parent; visible: false
-                            onPaint: {
-                                let ctx = getContext("2d"); ctx.reset()
-                                let s = root.skew
-                                ctx.beginPath()
-                                ctx.moveTo(s,0); ctx.lineTo(width,0)
-                                ctx.lineTo(width-s,height); ctx.lineTo(0,height)
-                                ctx.closePath(); ctx.fillStyle = "white"; ctx.fill()
-                            }
-                            onWidthChanged: requestPaint(); onHeightChanged: requestPaint()
-                            Component.onCompleted: requestPaint()
-                        }
-
                         Item {
                             anchors.fill: parent
                             layer.enabled: true
-                            layer.effect: OpacityMask { maskSource: mask }
+                            layer.effect: OpacityMask {
+                                maskSource: Rectangle {
+                                    width: shapeRoot.width
+                                    height: shapeRoot.height
+                                    radius: 16
+                                }
+                            }
 
                             Rectangle { anchors.fill: parent; color: Qt.rgba(1,1,1,0.04) }
 
@@ -567,6 +714,7 @@ PanelWindow {
                                 height: 28; color: Qt.rgba(0.4, 0.9, 0.55, 0.85)
                                 visible: cell.isCurrentWallpaper
                                 Text {
+                                    renderType: Text.NativeRendering
                                     anchors.centerIn: parent; text: "ACTIVE"
                                     color: "white"; font.pixelSize: 13
                                     font.family: root.iconFontFamily; font.weight: Font.Bold
@@ -574,40 +722,22 @@ PanelWindow {
                             }
                         }
 
-                        Canvas {
-                            id: hairlineOutline; anchors.fill: parent
-                            onPaint: {
-                                let ctx = getContext("2d"); ctx.reset()
-                                let s = root.skew
-                                ctx.beginPath()
-                                ctx.moveTo(s,0); ctx.lineTo(width,0)
-                                ctx.lineTo(width-s,height); ctx.lineTo(0,height)
-                                ctx.closePath()
-                                ctx.lineWidth = IslandMotion.surfaceBorderWidth
-                                ctx.strokeStyle = IslandMotion.surfaceBorderColor
-                                ctx.stroke()
-                            }
-                            onWidthChanged: requestPaint(); onHeightChanged: requestPaint()
-                            Component.onCompleted: requestPaint()
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            radius: 16
+                            border.width: IslandMotion.surfaceBorderWidth
+                            border.color: IslandMotion.surfaceBorderColor
                         }
 
-                        Canvas {
-                            id: outline; anchors.fill: parent
-                            property real ow: cell.isCurrent ? 2.5 : 0
-                            onOwChanged: requestPaint()
-                            onWidthChanged: requestPaint(); onHeightChanged: requestPaint()
-                            Component.onCompleted: requestPaint()
-                            onPaint: {
-                                let ctx = getContext("2d"); ctx.reset()
-                                if (ow <= 0) return
-                                let s = root.skew
-                                ctx.beginPath()
-                                ctx.moveTo(s,0); ctx.lineTo(width,0)
-                                ctx.lineTo(width-s,height); ctx.lineTo(0,height)
-                                ctx.closePath()
-                                ctx.lineWidth = ow
-                                ctx.strokeStyle = Qt.rgba(1.0,1.0,1.0,0.90)
-                                ctx.stroke()
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            radius: 16
+                            border.width: cell.isCurrent ? 2.5 : 0
+                            border.color: Qt.rgba(1.0, 1.0, 1.0, 0.90)
+                            Behavior on border.width {
+                                NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
                             }
                         }
 
@@ -622,11 +752,164 @@ PanelWindow {
                 }
             }
 
+            GridView {
+                id: wallpaperGrid
+                anchors {
+                    left: parent.left; right: parent.right
+                    top: searchBar.bottom
+                    bottom: bottomBar.top
+                    leftMargin: 24; rightMargin: 24
+                    topMargin: 12
+                }
+                visible: opacity > 0.01
+                opacity: root.gridMode ? 1 : 0
+                clip: true
+                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+                model: root.gridFilteredWallpapers
+                cellWidth: root.gridCellSize
+                cellHeight: root.gridCellSize
+
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                Keys.onReturnPressed: root.applyGridSelected()
+                Keys.onPressed: (event) => {
+                    if (event.key === Qt.Key_R) { root.applyRandom(); randomButtonPop.restart(); event.accepted = true }
+                }
+
+                delegate: Item {
+                    id: gridCell
+                    width: root.gridCellSize
+                    height: root.gridCellSize
+
+                    required property int index
+                    property string wallPath: root.gridFilteredWallpapers[index] || ""
+                    property bool isSelected: root.gridSelectedIndex === index
+                    property bool isCurrentWallpaper: root.currentWallpaper === wallPath
+                    property string thumbSrc: {
+                        let cached = root.thumbMap[wallPath]
+                        if (cached && cached !== "") return "file://" + cached
+                        if (!root.isVideo(wallPath)) return "file://" + wallPath
+                        return ""
+                    }
+
+                    Item {
+                        anchors.fill: parent
+                        anchors.margins: 6
+
+                        Item {
+                            id: gridThumbClip
+                            anchors.fill: parent
+                            layer.enabled: true
+                            layer.effect: OpacityMask {
+                                maskSource: Rectangle {
+                                    width: gridThumbClip.width
+                                    height: gridThumbClip.height
+                                    radius: 12
+                                }
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Qt.rgba(1,1,1,0.06)
+                            }
+
+                            Image {
+                                anchors.fill: parent
+                                source: gridCell.thumbSrc
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true; smooth: true; mipmap: true; cache: true
+                                sourceSize.width: 400
+                                sourceSize.height: 400
+                                visible: status === Image.Ready
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Qt.rgba(1,1,1,0.03)
+                                visible: gridCell.thumbSrc === ""
+                                Text {
+                                    renderType: Text.NativeRendering
+                                    anchors.centerIn: parent
+                                    text: root.isVideo(gridCell.wallPath) ? "\uf144" : "\uf03e"
+                                    font.family: root.iconFontFamily
+                                    font.pixelSize: 24
+                                    color: "white"; opacity: 0.15
+                                }
+                            }
+
+                            Rectangle {
+                                anchors.top: parent.top; anchors.right: parent.right
+                                anchors.margins: 6
+                                width: 18; height: 18; radius: 9
+                                color: Qt.rgba(0, 0, 0, 0.55)
+                                visible: root.isVideo(gridCell.wallPath)
+                                Text {
+                                    renderType: Text.NativeRendering
+                                    anchors.centerIn: parent; text: "\uf144"
+                                    font.family: root.iconFontFamily
+                                    font.pixelSize: 8
+                                    color: "white"; opacity: 0.85
+                                }
+                            }
+
+                            Rectangle {
+                                anchors.bottom: parent.bottom
+                                anchors.left: parent.left; anchors.right: parent.right
+                                height: 18
+                                color: Qt.rgba(0.4, 0.9, 0.55, 0.85)
+                                visible: gridCell.isCurrentWallpaper
+                                Text {
+                                    renderType: Text.NativeRendering
+                                    anchors.centerIn: parent; text: "ACTIVE"
+                                    color: "white"; font.pixelSize: 9
+                                    font.family: root.iconFontFamily; font.weight: Font.Bold
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            radius: 12
+                            border.width: IslandMotion.surfaceBorderWidth
+                            border.color: IslandMotion.surfaceBorderColor
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            radius: 12
+                            border.width: gridCell.isSelected ? 2 : 0
+                            border.color: Qt.rgba(1.0, 1.0, 1.0, 0.90)
+                            Behavior on border.width {
+                                NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onEntered: root.gridSelectedIndex = gridCell.index
+                            onClicked: {
+                                root.gridSelectedIndex = gridCell.index
+                                let path = root.gridFilteredWallpapers[gridCell.index]
+                                if (path) {
+                                    if (root.isVideo(path)) root.setVideoWallpaper(path)
+                                    else root.setStaticWallpaper(path)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Text {
                 anchors {
                     left: parent.left; right: parent.right
-                    top: parent.top; bottom: bottomBar.top
-                    topMargin: 0
+                    top: root.gridMode ? searchBar.bottom : parent.top
+                    bottom: bottomBar.top
                 }
                 visible: root.filteredWallpapers.length === 0
                 horizontalAlignment: Text.AlignHCenter
@@ -652,9 +935,13 @@ PanelWindow {
                     color: mediaFilterMouse.containsMouse ? Qt.rgba(1,1,1,0.22) : Qt.rgba(1,1,1,0.10)
                     border.color: Qt.rgba(1,1,1,0.35); border.width: 1
                     Behavior on color { ColorAnimation { duration: 120 } }
-                    scale: mediaFilterMouse.pressed ? 0.92 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+                    SequentialAnimation {
+                        id: mediaFilterPop
+                        NumberAnimation { target: mediaFilterButton; property: "scale"; to: 1.18; duration: 100; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: mediaFilterButton; property: "scale"; to: 1.0;  duration: 180; easing.type: Easing.OutBack }
+                    }
                     Text {
+                        renderType: Text.NativeRendering
                         anchors.centerIn: parent
                         text: root.mediaFilter === "photo" ? "\uf03e"
                             : root.mediaFilter === "video" ? "\uf144" : "\uf00a"
@@ -663,7 +950,47 @@ PanelWindow {
                     }
                     MouseArea {
                         id: mediaFilterMouse; anchors.fill: parent; hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor; onClicked: root.cycleMediaFilter()
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: { root.cycleMediaFilter(); mediaFilterPop.restart() }
+                    }
+                }
+
+                Rectangle {
+                    id: gridToggleButton
+                    width: 36; height: 36; radius: 18
+                    anchors.left: mediaFilterButton.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: 10
+                    color: root.gridMode
+                        ? Qt.rgba(1,1,1,0.22)
+                        : (gridToggleMouse.containsMouse ? Qt.rgba(1,1,1,0.16) : Qt.rgba(1,1,1,0.10))
+                    border.color: root.gridMode ? Qt.rgba(1,1,1,0.60) : Qt.rgba(1,1,1,0.35)
+                    border.width: 1
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    SequentialAnimation {
+                        id: gridTogglePop
+                        NumberAnimation { target: gridToggleButton; property: "scale"; to: 1.18; duration: 100; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: gridToggleButton; property: "scale"; to: 1.0;  duration: 180; easing.type: Easing.OutBack }
+                    }
+                    Image {
+                        anchors.centerIn: parent
+                        width: 16; height: 16
+                        source: Quickshell.shellDir + "/qml/shared/assets/app-launcher.svg"
+                        opacity: root.gridMode ? 1.0 : 0.85
+                    }
+                    MouseArea {
+                        id: gridToggleMouse; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.gridMode = !root.gridMode
+                            gridTogglePop.restart()
+                            if (root.gridMode) {
+                                gridSearchInput.forceActiveFocus()
+                                root.gridSelectedIndex = 0
+                            } else {
+                                carousel.forceActiveFocus()
+                            }
+                        }
                     }
                 }
 
@@ -682,7 +1009,9 @@ PanelWindow {
                             { key: "mono",   color: "#9e9e9e" }
                         ]
                         delegate: Rectangle {
+                            id: bucketDot
                             required property var modelData
+                            required property int index
                             anchors.verticalCenter: parent.verticalCenter
                             width: 30; height: 30; radius: 15
                             color: modelData.key === "all" ? "transparent" : modelData.color
@@ -690,14 +1019,27 @@ PanelWindow {
                             border.color: root.selectedBucket === modelData.key
                                           ? Qt.rgba(1,1,1,0.95) : Qt.rgba(1,1,1,0.25)
                             Behavior on border.width { NumberAnimation { duration: 120 } }
+                            Behavior on border.color { ColorAnimation { duration: 120 } }
+                            SequentialAnimation {
+                                id: bucketPop
+                                NumberAnimation { target: bucketDot; property: "scale"; to: 1.28; duration: 90;  easing.type: Easing.OutCubic }
+                                NumberAnimation { target: bucketDot; property: "scale"; to: 1.0;  duration: 200; easing.type: Easing.OutBack }
+                            }
+                            Connections {
+                                target: root
+                                function onPopBucketIndexChanged() {
+                                    if (root.popBucketIndex === bucketDot.index) bucketPop.restart()
+                                }
+                            }
                             Text {
+                                renderType: Text.NativeRendering
                                 anchors.centerIn: parent; visible: modelData.key === "all"
                                 text: "\u2715"; color: "white"; opacity: 0.6; font.pixelSize: 11
                             }
                             MouseArea {
                                 anchors.fill: parent; hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.selectedBucket = modelData.key
+                                onClicked: { root.selectedBucket = modelData.key; bucketPop.restart() }
                             }
                         }
                     }
@@ -711,16 +1053,21 @@ PanelWindow {
                     color: randomButtonMouse.containsMouse ? Qt.rgba(1,1,1,0.22) : Qt.rgba(1,1,1,0.10)
                     border.color: Qt.rgba(1,1,1,0.35); border.width: 1
                     Behavior on color { ColorAnimation { duration: 120 } }
-                    scale: randomButtonMouse.pressed ? 0.92 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+                    SequentialAnimation {
+                        id: randomButtonPop
+                        NumberAnimation { target: randomButton; property: "scale"; to: 1.18; duration: 100; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: randomButton; property: "scale"; to: 1.0;  duration: 180; easing.type: Easing.OutBack }
+                    }
                     Text {
+                        renderType: Text.NativeRendering
                         anchors.centerIn: parent; text: "\uf522"
                         font.family: root.iconFontFamily; font.pixelSize: 14
                         color: "white"; opacity: 0.85
                     }
                     MouseArea {
                         id: randomButtonMouse; anchors.fill: parent; hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor; onClicked: root.applyRandom()
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: { root.applyRandom(); randomButtonPop.restart() }
                     }
                 }
             }

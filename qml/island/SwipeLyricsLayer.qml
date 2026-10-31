@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Qt5Compat.GraphicalEffects
+import Quickshell.Services.Mpris
 import "../shared"
 import IslandBackend
 import Quickshell._Window
@@ -39,6 +40,9 @@ readonly property real trayReserved: 0
     property real lyricChangeProgress: 1
 property int recordingDotSpacing: -5
     property var cavaLevels: []
+    property var activePlayer: null
+    readonly property bool isPlaying: activePlayer !== null
+        && activePlayer.playbackState === MprisPlaybackState.Playing
 
     readonly property real clampedProgress: Math.max(0, Math.min(1, transitionProgress))
     readonly property bool lyricMostlyVisible: clampedProgress > 0.92
@@ -147,6 +151,7 @@ readonly property real preferredWidth: Math.max(
     }
 
 Item {
+        id: lyricsArtContainer
         visible: currentArtUrl !== "" && root.lyricMostlyVisible
         width: root.artSize
         height: root.artSize
@@ -154,16 +159,32 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         opacity: clampedProgress
 
-        Image {
-    id: artImage
-    anchors.fill: parent
-    source: currentArtUrl
-    fillMode: Image.PreserveAspectCrop
+        RotationAnimation on rotation {
+            running: root.isPlaying
+            from: lyricsArtContainer.rotation
+            to: lyricsArtContainer.rotation + 360
+            duration: 8000
+            direction: RotationAnimation.Clockwise
+            loops: Animation.Infinite
+        }
+        NumberAnimation {
+            running: !root.isPlaying
+            target: lyricsArtContainer
+            property: "rotation"
+            to: lyricsArtContainer.rotation
+            duration: 400
+            easing.type: Easing.OutCubic
+        }
 
-    sourceSize: Qt.size(64, 64)
-    cache: true
-    visible: false
-}
+        Image {
+            id: artImage
+            anchors.fill: parent
+            source: currentArtUrl
+            fillMode: Image.PreserveAspectCrop
+            sourceSize: Qt.size(64, 64)
+            cache: true
+            visible: false
+        }
 
         Rectangle {
             id: artMask
@@ -172,7 +193,7 @@ Item {
             visible: false
         }
 
-OpacityMask {
+        OpacityMask {
             anchors.fill: parent
             source: artImage
             maskSource: artMask
@@ -181,9 +202,33 @@ OpacityMask {
         Rectangle {
             anchors.fill: parent
             radius: width / 2
+            color: "black"
+            opacity: root.isPlaying ? 0 : 0.40
+            Behavior on opacity { NumberAnimation { duration: 300 } }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
+            color: "transparent"
+            border.width: 2
+            border.color: Qt.rgba(1,1,1,0.55)
+            visible: root.isPlaying
+            SequentialAnimation on border.color {
+                running: root.isPlaying
+                loops: Animation.Infinite
+                ColorAnimation { to: Qt.rgba(1,1,1,0.85); duration: 700; easing.type: Easing.InOutSine }
+                ColorAnimation { to: Qt.rgba(1,1,1,0.20); duration: 700; easing.type: Easing.InOutSine }
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
             color: "transparent"
             border.width: IslandMotion.surfaceBorderWidth
             border.color: IslandMotion.surfaceBorderColor
+            visible: !root.isPlaying
         }
     }
     

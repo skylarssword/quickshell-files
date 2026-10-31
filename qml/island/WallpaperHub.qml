@@ -599,7 +599,7 @@ Item {
                         color: cellItem.isSelected       ? Qt.rgba(1,1,1,0.12)
                              : hoverMouse.containsMouse   ? Qt.rgba(1,1,1,0.08)
                              : Qt.rgba(1,1,1,0.03)
-                        border.color: cellItem.isSelected      ? Qt.rgba(0.0, 0.66, 1.0, 0.85)
+                        border.color: cellItem.isSelected      ? Qt.rgba(1.0, 1.0, 1.0, 0.90)
                                     : cellItem.isCurrent       ? Qt.rgba(0.4,0.9,0.55,0.6)
                                     : hoverMouse.containsMouse ? Qt.rgba(1,1,1,0.2)
                                     : Qt.rgba(1,1,1,0.07)
@@ -697,7 +697,7 @@ Item {
                             anchors.fill: parent
                             radius: parent.radius
                             color: "transparent"
-                            border.color: cellItem.isSelected      ? Qt.rgba(0.0, 0.66, 1.0, 0.85)
+                            border.color: cellItem.isSelected      ? Qt.rgba(1.0, 1.0, 1.0, 0.90)
                                         : cellItem.isCurrent       ? Qt.rgba(0.4,0.9,0.55,0.6)
                                         : hoverMouse.containsMouse ? Qt.rgba(1,1,1,0.2)
                                         : Qt.rgba(1,1,1,0.07)
@@ -1054,35 +1054,16 @@ Item {
                         Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                         Behavior on opacity { NumberAnimation { duration: 220 } }
 
-                        Canvas {
-                            id: quickParallelogramMask
-                            anchors.fill: parent
-                            visible: false
-
-                            onPaint: {
-                                let ctx = getContext("2d")
-                                ctx.reset()
-                                let s = root.quickSkew
-                                ctx.beginPath()
-                                ctx.moveTo(s, 0)
-                                ctx.lineTo(width, 0)
-                                ctx.lineTo(width - s, height)
-                                ctx.lineTo(0, height)
-                                ctx.closePath()
-                                ctx.fillStyle = "white"
-                                ctx.fill()
-                            }
-                            onWidthChanged: requestPaint()
-                            onHeightChanged: requestPaint()
-                            Component.onCompleted: requestPaint()
-                        }
-
                         Item {
                             id: quickThumbClip
                             anchors.fill: parent
                             layer.enabled: true
                             layer.effect: OpacityMask {
-                                maskSource: quickParallelogramMask
+                                maskSource: Rectangle {
+                                    width: quickThumbClip.width
+                                    height: quickThumbClip.height
+                                    radius: 12
+                                }
                             }
 
                             Rectangle {
@@ -1147,54 +1128,22 @@ Item {
                             }
                         }
 
-Canvas {
-                            id: quickHairline
+                        Rectangle {
                             anchors.fill: parent
-                            onPaint: {
-                                let ctx = getContext("2d")
-                                ctx.reset()
-                                let s = root.quickSkew
-                                ctx.beginPath()
-                                ctx.moveTo(s, 0)
-                                ctx.lineTo(width, 0)
-                                ctx.lineTo(width - s, height)
-                                ctx.lineTo(0, height)
-                                ctx.closePath()
-                                ctx.lineWidth = IslandMotion.surfaceBorderWidth
-                                ctx.strokeStyle = IslandMotion.surfaceBorderColor
-                                ctx.stroke()
-                            }
-                            onWidthChanged: requestPaint()
-                            onHeightChanged: requestPaint()
-                            Component.onCompleted: requestPaint()
+                            color: "transparent"
+                            radius: 12
+                            border.width: IslandMotion.surfaceBorderWidth
+                            border.color: IslandMotion.surfaceBorderColor
                         }
 
-                        Canvas {
-                            id: quickOutline
+                        Rectangle {
                             anchors.fill: parent
-                            property color outlineColor: Qt.rgba(0.0, 0.66, 1.0, 0.85)
-                            property real outlineWidth: quickCell.isCurrent ? 2 : 0
-
-                            onOutlineColorChanged: requestPaint()
-                            onOutlineWidthChanged: requestPaint()
-                            onWidthChanged: requestPaint()
-                            onHeightChanged: requestPaint()
-                            Component.onCompleted: requestPaint()
-
-                            onPaint: {
-                                let ctx = getContext("2d")
-                                ctx.reset()
-                                if (outlineWidth <= 0) return
-                                let s = root.quickSkew
-                                ctx.beginPath()
-                                ctx.moveTo(s, 0)
-                                ctx.lineTo(width, 0)
-                                ctx.lineTo(width - s, height)
-                                ctx.lineTo(0, height)
-                                ctx.closePath()
-                                ctx.lineWidth = outlineWidth
-                                ctx.strokeStyle = outlineColor
-                                ctx.stroke()
+                            color: "transparent"
+                            radius: 12
+                            border.width: quickCell.isCurrent ? 2 : 0
+                            border.color: Qt.rgba(1.0, 1.0, 1.0, 0.85)
+                            Behavior on border.width {
+                                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
                             }
                         }
 

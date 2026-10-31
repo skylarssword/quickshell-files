@@ -110,9 +110,30 @@ Row {
         spacing: 8
 
         Item {
+            id: customArtContainer
             width: 26; height: 26
             anchors.verticalCenter: parent.verticalCenter
             visible: root.currentArtUrl !== ""
+
+            readonly property bool isPlaying: root.activePlayer !== null
+                && root.activePlayer.playbackState === MprisPlaybackState.Playing
+
+            RotationAnimation on rotation {
+                running: customArtContainer.isPlaying
+                from: customArtContainer.rotation
+                to: customArtContainer.rotation + 360
+                duration: 8000
+                direction: RotationAnimation.Clockwise
+                loops: Animation.Infinite
+            }
+            NumberAnimation {
+                running: !customArtContainer.isPlaying
+                target: customArtContainer
+                property: "rotation"
+                to: customArtContainer.rotation
+                duration: 400
+                easing.type: Easing.OutCubic
+            }
 
             Image {
                 id: customArtImage
@@ -133,12 +154,37 @@ Row {
                 source: customArtImage
                 maskSource: customArtMask
             }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: "black"
+                opacity: customArtContainer.isPlaying ? 0 : 0.40
+                Behavior on opacity { NumberAnimation { duration: 300 } }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: "transparent"
+                border.width: 2
+                border.color: Qt.rgba(1,1,1,0.55)
+                visible: customArtContainer.isPlaying
+                SequentialAnimation on border.color {
+                    running: customArtContainer.isPlaying
+                    loops: Animation.Infinite
+                    ColorAnimation { to: Qt.rgba(1,1,1,0.85); duration: 700; easing.type: Easing.InOutSine }
+                    ColorAnimation { to: Qt.rgba(1,1,1,0.20); duration: 700; easing.type: Easing.InOutSine }
+                }
+            }
+
             Rectangle {
                 anchors.fill: parent
                 radius: width / 2
                 color: "transparent"
                 border.width: IslandMotion.surfaceBorderWidth
                 border.color: IslandMotion.surfaceBorderColor
+                visible: !customArtContainer.isPlaying
             }
         }
 

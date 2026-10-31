@@ -26,6 +26,8 @@ Item {
 
     signal closeRequested()
     signal launchRequested(string cmd, bool isCommand)
+    signal screenshotModeRequested(string mode)
+    signal screenshotGalleryRequested()
 
     readonly property int inputRowHeight: 44
     readonly property int iconCellSize: 92        
@@ -37,7 +39,7 @@ Item {
 
     readonly property int minCols: 6
     readonly property int maxCols: 10
-    readonly property int appCountForLayout: isWallpaperMode
+    readonly property int appCountForLayout: (isWallpaperMode || isScreenshotMode)
         ? 0
         : (filteredApps.length > 0 ? filteredApps.length : allApps.length)
     readonly property int gridCols: {
@@ -54,12 +56,12 @@ Item {
         ? (wallpaperHubLoader.item
             ? (wallpaperHubLoader.item.viewMode, wallpaperHubLoader.item.capsuleWidth)
             : 700)
-        : Math.max(620, gridCols * iconCellSize + gridSideMargin * 2)
+        : (isScreenshotMode ? 340 : Math.max(620, gridCols * iconCellSize + gridSideMargin * 2))
     property int capsuleHeight: isWallpaperMode
         ? (wallpaperHubLoader.item
             ? (wallpaperHubLoader.item.viewMode, root.inputRowHeight + wallpaperHubLoader.item.capsuleHeight)
             : (inputRowHeight + 334))
-        : (inputRowHeight + appGridHeight)
+        : (isScreenshotMode ? inputRowHeight + 56 : (inputRowHeight + appGridHeight))
 
     property bool isCommandMode: false
     readonly property bool isLoading: appCacheLoader.running
@@ -126,6 +128,11 @@ Item {
                q === "wp"          || q === "background"  ||
                q === "backgrounds" || q === "bg"          ||
                q.startsWith("wallpaper ") || q.startsWith("wp ")
+    }
+
+    readonly property bool isScreenshotMode: {
+        let q = searchText.trim().toLowerCase()
+        return q === "sc" || q === "screenshot" || q === "screenshots" || q === "ss"
     }
     property int selectedIndex: 0
 
@@ -227,8 +234,7 @@ Item {
     }
 
     function rebuildFiltered() {
-        if (isWallpaperMode) {
-            
+        if (isWallpaperMode || isScreenshotMode) {
             return
         }
 
@@ -384,8 +390,60 @@ Item {
 
         Item {
             width: parent.width
+            height: 56
+            visible: root.isScreenshotMode
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 22
+
+                Repeater {
+                    model: [
+                        { glyph: "\uf0c8", mode: "area"   },
+                        { glyph: "\uf26c", mode: "screen" },
+                        { glyph: "\uf2d0", mode: "active" },
+                        { glyph: "\uf03e", mode: "gallery"}
+                    ]
+
+                    delegate: Item {
+                        required property var modelData
+                        width: 34; height: 34
+
+                        Text {
+                            renderType: Text.NativeRendering
+                            anchors.centerIn: parent
+                            text: modelData.glyph
+                            font.family: root.iconFontFamily
+                            font.pixelSize: 18
+                            color: ssMouse.containsMouse ? "white" : Qt.rgba(1,1,1,0.72)
+                            scale: ssMouse.containsMouse ? 1.15 : 1.0
+                            Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+                            Behavior on scale { NumberAnimation { duration: IslandMotion.micro; easing.type: IslandMotion.easeSpring } }
+                        }
+
+                        MouseArea {
+                            id: ssMouse
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (modelData.mode === "gallery") {
+                                    root.screenshotGalleryRequested()
+                                } else {
+                                    root.screenshotModeRequested(modelData.mode)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Item {
+            width: parent.width
             height: root.appGridHeight
-            visible: root.isCommandMode && !root.isWallpaperMode
+            visible: root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode
 
             Column {
                 anchors.centerIn: parent
@@ -454,7 +512,7 @@ Item {
             height: root.appGridHeight - root.footerHeight
             anchors.leftMargin: root.gridSideMargin
             anchors.rightMargin: root.gridSideMargin
-            visible: !root.isCommandMode && !root.isWallpaperMode
+            visible: !root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode
             clip: true
 
             cellWidth: Math.floor((root.capsuleWidth - root.gridSideMargin * 2) / Math.max(1, root.gridCols))
@@ -581,7 +639,7 @@ Item {
             renderType: Text.NativeRendering
             width: parent.width
             height: root.footerHeight
-            visible: !root.isCommandMode && !root.isWallpaperMode
+            visible: !root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             text: {

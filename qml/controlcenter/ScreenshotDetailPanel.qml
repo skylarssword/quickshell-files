@@ -50,7 +50,7 @@ Item {
 
 Process {
         id: openExec
-        function run(path) { command = ["bash", "-c", "xdg-open " + JSON.stringify(path)]; running = true }
+        function run(path) { command = ["bash", "-c", "loupe " + JSON.stringify(path) + " &"]; running = true }
     }
 
     Process {

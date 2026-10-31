@@ -192,9 +192,9 @@ implicitHeight: Math.max(
     )
 exclusiveZone: (root.idleMode || root.sidebarEnabled) ? 0 : (root.gamemodeActive ? 60 : 35)
     aboveWindows: true
-focusable: root.overviewVisible || root.connectivityPromptActive || islandContainer.islandState === "info" || islandContainer.islandState === "search" || islandContainer.islandState === "control_center"
+focusable: root.overviewVisible || root.connectivityPromptActive || islandContainer.islandState === "info" || islandContainer.islandState === "search" || islandContainer.islandState === "control_center" || islandContainer.islandState === "screenshot_gallery"
 WlrLayershell.layer: root.idleMode ? WlrLayer.Background : (root.pinned ? WlrLayer.Overlay : WlrLayer.Top)
-WlrLayershell.keyboardFocus: (root.overviewVisible || islandContainer.islandState === "search")
+WlrLayershell.keyboardFocus: (root.overviewVisible || islandContainer.islandState === "search" || islandContainer.islandState === "screenshot_gallery")
         ? WlrKeyboardFocus.Exclusive
         : ((root.connectivityPromptActive || islandContainer.islandState === "info" || islandContainer.islandState === "control_center")
             ? WlrKeyboardFocus.OnDemand
@@ -414,6 +414,7 @@ Connections {
             if (islandContainer.islandState === "info") infoLayerFocusTimer.restart()
             if (islandContainer.islandState === "search") searchFocusTimer.restart()
             if (islandContainer.islandState === "control_center") controlCenterFocusTimer.restart()
+            if (islandContainer.islandState === "screenshot_gallery") controlCenterFocusTimer.restart()
         }
     }
 
@@ -838,6 +839,7 @@ property bool expandedByPlayerAutoOpen: false
             || islandState === "lyrics_control_center"
             || islandState === "equalizer"
             || islandState === "power_menu"
+            || islandState === "screenshot_gallery"
             || islandState === "notification_center"
             || islandState === "notification"
         readonly property bool splitShowsProgress: islandState === "split" && osdProgress >= 0
@@ -881,6 +883,7 @@ property bool expandedByPlayerAutoOpen: false
                 readonly property bool notificationLayerVisible: !root.overviewVisible && islandState === "notification"
 readonly property bool controlCenterLayerVisible: !root.overviewVisible && islandState === "control_center"
 readonly property bool powerMenuLayerVisible: !root.overviewVisible && islandState === "power_menu"
+        readonly property bool screenshotGalleryLayerVisible: !root.overviewVisible && islandState === "screenshot_gallery"
 readonly property bool notificationCenterLayerVisible: !root.overviewVisible && islandState === "notification_center"
 readonly property bool capturingLayerVisible: !root.overviewVisible && islandState === "capturing"
         readonly property bool searchLayerVisible: !root.overviewVisible && islandState === "search"
@@ -997,6 +1000,11 @@ readonly property bool capturingLayerVisible: !root.overviewVisible && islandSta
 
 Keys.onPressed: (event) => {
             if (islandContainer.islandState === "control_center" && event.key === Qt.Key_Escape) {
+                islandContainer.smartRestoreState();
+                event.accepted = true;
+                return;
+            }
+            if (islandContainer.islandState === "screenshot_gallery" && event.key === Qt.Key_Escape) {
                 islandContainer.smartRestoreState();
                 event.accepted = true;
                 return;
@@ -1668,6 +1676,15 @@ function toggleDnd() {
             stopAutoHideTimer();
         }
 
+        function showScreenshotGallery() {
+            cancelSideSwipeSettle()
+            abortSideTransientMode()
+            clearTransientCapsule()
+            islandState = "screenshot_gallery"
+            mainCapsule.displayedWidth = mainCapsule.baseTargetWidth
+            stopAutoHideTimer()
+        }
+
         function showPowerMenu() {
             cancelSideSwipeSettle();
             abortSideTransientMode();
@@ -1870,6 +1887,8 @@ case "capturing":
                     return 420;
                 case "power_menu":
                     return 340;
+                case "screenshot_gallery":
+                    return 700;
                 case "notification_center":
                     return 340;
                 case "info":
@@ -1907,6 +1926,8 @@ case "control_center":
                     return 320 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterExtraHeight : 32);
 case "power_menu":
                     return 72;
+                case "screenshot_gallery":
+                    return 420;
                 case "notification_center":
                     return notificationCenterLoader.item
                         ? Math.min(420, notificationCenterLoader.item.contentHeight)
@@ -1946,6 +1967,8 @@ case "capturing":
                     return 34;
                 case "power_menu":
                     return 36;
+                case "screenshot_gallery":
+                    return 28;
                 case "notification_center":
                     return 26;
                     case "info":
@@ -2332,6 +2355,7 @@ showTray: false
 showCondition: true
                         onPreferredWidthChanged: islandContainer.syncLyricsCapsuleWidth()
                         currentArtUrl: islandContainer.currentArtUrl
+                        activePlayer: islandContainer.activePlayer
                         cavaLevels: islandContainer.cavaLevels
                     }
                 }
@@ -2529,12 +2553,24 @@ SearchPillLayer {
                         onCapsuleWidthChanged: searchLoader.capsuleWidth = capsuleWidth
                         onCapsuleHeightChanged: searchLoader.capsuleHeight = capsuleHeight
                         onCloseRequested: islandContainer.smartRestoreState()
-onLaunchRequested: function(exec, isCmd) {
+                        onLaunchRequested: function(exec, isCmd) {
                             if (isCmd)
                                 searchExec.run(exec)
                             else
                                 searchExec.launch(exec)
                             islandContainer.smartRestoreState()
+                        }
+                        onScreenshotModeRequested: function(mode) {
+                            islandContainer.smartRestoreState()
+                            islandContainer.showCapturing("Capturing…")
+                            screenshotDelayTimer.pendingMode = mode
+                            screenshotDelayTimer.pendingDelay = 0
+                            screenshotDelayTimer.totalWait = mode === "active" ? 1500 : 0
+                            screenshotDelayTimer.elapsed = 0
+                            screenshotDelayTimer.restart()
+                        }
+                        onScreenshotGalleryRequested: {
+                            islandContainer.showScreenshotGallery()
                         }
                     }
                 }
@@ -2673,6 +2709,23 @@ sidebarEnabled: root.sidebarEnabled
                         textFontFamily: root.textFontFamily
                         showCondition: islandContainer.powerMenuLayerVisible
                             onOpenControlCenterRequested: islandContainer.showControlCenter()
+                        onCloseRequested: islandContainer.smartRestoreState()
+                    }
+                }
+            }
+
+            Loader {
+                id: screenshotGalleryLoader
+                anchors.fill: parent
+                active: islandContainer.screenshotGalleryLayerVisible
+                asynchronous: false
+                visible: active
+
+                sourceComponent: Component {
+                    ScreenshotGalleryLayer {
+                        iconFontFamily: root.iconFontFamily
+                        textFontFamily: root.textFontFamily
+                        showCondition: islandContainer.screenshotGalleryLayerVisible
                         onCloseRequested: islandContainer.smartRestoreState()
                     }
                 }

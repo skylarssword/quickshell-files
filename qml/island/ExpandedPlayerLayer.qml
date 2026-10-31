@@ -157,15 +157,15 @@ Column {
                     height: 75
 
                     Image {
-    id: expandedArtImage
-    anchors.fill: parent
-    source: currentArtUrl
-    fillMode: Image.PreserveAspectCrop
-    sourceSize: Qt.size(200, 200)
-    smooth: true
-    mipmap: true
-    visible: false
-}
+                        id: expandedArtImage
+                        anchors.fill: parent
+                        source: currentArtUrl
+                        fillMode: Image.PreserveAspectCrop
+                        sourceSize: Qt.size(200, 200)
+                        smooth: true
+                        mipmap: true
+                        visible: false
+                    }
 
                     Rectangle {
                         id: expandedArtMask
@@ -174,10 +174,51 @@ Column {
                         visible: false
                     }
 
-                    OpacityMask {
+                    Item {
+                        id: artSpinner
                         anchors.fill: parent
-                        source: expandedArtImage
-                        maskSource: expandedArtMask
+
+                        property real angle: 0
+
+                        RotationAnimation on angle {
+                            id: spinAnim
+                            from: 0
+                            to: 360
+                            duration: 8000
+                            direction: RotationAnimation.Clockwise
+                            loops: Animation.Infinite
+                            running: isPlaying && currentArtUrl !== ""
+                            paused: !isPlaying
+                        }
+
+                        Behavior on angle {
+                            enabled: false
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: Qt.rgba(1, 1, 1, 0.06)
+                            visible: currentArtUrl === ""
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: currentArtUrl === ""
+                            text: "\uf001"
+                            font.family: iconFontFamily
+                            font.pixelSize: 26
+                            color: "white"
+                            opacity: 0.4
+                            renderType: Text.NativeRendering
+                        }
+
+                        OpacityMask {
+                            anchors.fill: parent
+                            rotation: artSpinner.angle
+                            source: expandedArtImage
+                            maskSource: expandedArtMask
+                        }
                     }
 
                     Rectangle {

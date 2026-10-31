@@ -1184,9 +1184,33 @@ Rectangle {
                         Rectangle {
                             anchors.fill: parent
                             radius: width / 2
+                            color: "black"
+                            opacity: controlCenter.isPlayingNow ? 0 : 0.40
+                            Behavior on opacity { NumberAnimation { duration: 300 } }
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: "transparent"
+                            border.width: 2
+                            border.color: Qt.rgba(1,1,1,0.55)
+                            visible: controlCenter.isPlayingNow
+                            SequentialAnimation on border.color {
+                                running: controlCenter.isPlayingNow
+                                loops: Animation.Infinite
+                                ColorAnimation { to: Qt.rgba(1,1,1,0.85); duration: 700; easing.type: Easing.InOutSine }
+                                ColorAnimation { to: Qt.rgba(1,1,1,0.20); duration: 700; easing.type: Easing.InOutSine }
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
                             color: "transparent"
                             border.width: IslandMotion.surfaceBorderWidth
                             border.color: IslandMotion.surfaceBorderColor
+                            visible: !controlCenter.isPlayingNow
                         }
 
                         RotationAnimation {

@@ -422,7 +422,8 @@ PanelWindow {
     component DockDivider: Rectangle {
         width: 1; height: 36; radius: 1
         color: IslandMotion.surfaceBorderColor
-        anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: 4
     }
 
     component AppButton: Item {
@@ -614,7 +615,7 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 clip: true
                 width: root.systrayOpen
-                    ? (trayRepeater.count * (root.iconSize - 12 + root.iconGap) + root.iconGap * 2 + 1)
+                    ? (trayRepeater.count * (root.iconSize - 12 + root.iconGap) + root.iconGap * 2)
                     : 0
                 Behavior on width {
                     NumberAnimation { duration: IslandMotion.standard; easing.type: IslandMotion.easeArrive }
@@ -751,16 +752,16 @@ PanelWindow {
                         }
                     }
                 }
+            }
 
-                DockDivider {
-                    visible: root.systrayOpen && trayRepeater.count > 0
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+            DockDivider {
+                visible: root.systrayOpen && trayRepeater.count > 0
             }
 
             Item {
                 width: root.iconSize; height: root.iconSize
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: 4
                 Image {
                     id: chevImg; anchors.centerIn: parent; width: 26; height: 26
                     source: Quickshell.shellDir + "/qml/shared/assets/chevron-double-left.svg"
