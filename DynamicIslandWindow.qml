@@ -2619,7 +2619,7 @@ SearchPillLayer {
             Loader {
                 id: controlCenterLoader
                 anchors.fill: parent
-                active: true
+                active: islandContainer.someLayerVisible
                 asynchronous: false
 
 sourceComponent: Component {

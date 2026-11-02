@@ -65,7 +65,7 @@ signal bubblesToggleRequested()
 
     Behavior on scale {
         NumberAnimation {
-            duration: IslandMotion.standard
+            duration: IslandMotion.micro
             easing.type: IslandMotion.easeArrive
         }
     }
