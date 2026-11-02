@@ -10,6 +10,7 @@ import "qml/shared"
 PanelWindow {
     id: root
 
+    readonly property string homeDir: Quickshell.env("HOME") || ""
     property bool   dockEnabled:        true
     property string dockMode:           "pin"
     property bool   sidebarActive:      false
@@ -73,10 +74,57 @@ PanelWindow {
         }
     }
     Timer {
-        interval: 700; repeat: true; triggeredOnStart: true
-        running: (root.dockMode === "smart" || root.dockMode === "bump") && root.dockEnabled
-        onTriggered: if (!windowCountQuery.running) windowCountQuery.running = true
+        id: windowCountRefreshTimer
+        interval: 100
+        repeat: false
+        onTriggered: {
+            if (!root.dockEnabled || !(root.dockMode === "smart" || root.dockMode === "bump"))
+                return
+            if (windowCountQuery.running)
+                windowCountRefreshTimer.restart()
+            else
+                windowCountQuery.running = true
+        }
     }
+
+    Timer {
+        id: clientsRefreshTimer
+        interval: 150
+        repeat: false
+        onTriggered: {
+            if (!root.dockEnabled)
+                return
+            if (activeAppsQuery.running)
+                clientsRefreshTimer.restart()
+            else
+                activeAppsQuery.running = true
+        }
+    }
+
+    Connections {
+        target: Hyprland
+
+        function onRawEvent(event) {
+            const name = event && event.name ? String(event.name) : ""
+            if (name === "")
+                return
+            const windowEvent = name.indexOf("window") !== -1 && name.indexOf("activewindow") === -1
+            if (windowEvent)
+                clientsRefreshTimer.restart()
+            if (windowEvent
+                    || name.indexOf("workspace") !== -1
+                    || name.indexOf("focusedmon") === 0
+                    || name === "fullscreen")
+                windowCountRefreshTimer.restart()
+        }
+    }
+
+    onDockEnabledChanged: {
+        clientsRefreshTimer.restart()
+        windowCountRefreshTimer.restart()
+        favFileReloadTimer.restart()
+    }
+    onDockModeChanged: windowCountRefreshTimer.restart()
 
     readonly property bool pillActuallyVisible:
         root.dockEnabled
@@ -190,10 +238,14 @@ PanelWindow {
         }
     }
 
-    Component.onCompleted: loadFavProc.running = true
+    Component.onCompleted: {
+        loadFavProc.running = true
+        clientsRefreshTimer.restart()
+        windowCountRefreshTimer.restart()
+    }
 
     Timer {
-        interval: 5000; repeat: true; running: root.dockEnabled
+        interval: 5000; repeat: false; running: root.dockEnabled
         onTriggered: {
             const expected = Object.keys(root.favoritesSet).length
             if (expected > 0 && root.favApps.length !== expected
@@ -204,10 +256,24 @@ PanelWindow {
     }
 
     property string _lastFavRaw: ""
+    FileView {
+        path: root.homeDir + "/.cache/quickshell/search-favorites.json"
+        watchChanges: true
+        preload: false
+        printErrors: false
+        onFileChanged: favFileReloadTimer.restart()
+    }
+
     Timer {
-        interval: 3000; repeat: true; running: root.dockEnabled
+        id: favFileReloadTimer
+        interval: 120
+        repeat: false
         onTriggered: {
-            if (!loadFavProc.running && !loadAppsProc.running)
+            if (!root.dockEnabled)
+                return
+            if (loadFavProc.running || loadAppsProc.running)
+                favFileReloadTimer.restart()
+            else
                 favPollProc.running = true
         }
     }
@@ -310,12 +376,6 @@ PanelWindow {
                 } catch(e) {}
             }
         }
-    }
-
-    Timer {
-        interval: 2000; repeat: true; triggeredOnStart: true
-        running: root.dockEnabled
-        onTriggered: if (!activeAppsQuery.running) activeAppsQuery.running = true
     }
 
     Process {

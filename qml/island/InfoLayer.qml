@@ -23,6 +23,8 @@ Item {
     property real   feelsLikeF:   0
     property string displayCity:  ""
     property bool   wxLoading:    false
+    property double lastWeatherFetch: 0
+    property bool   silentWeatherRefresh: false
     property string wxError:      ""
     property var    forecastDates:   []
     property var    forecastMax:     []
@@ -158,10 +160,13 @@ Item {
                     root.forecastPrecip  = j.daily.precipitation_probability_max || []
                     root.wxLoading = false
                     root.wxError = ""
+                    root.lastWeatherFetch = Date.now()
                 } catch(e) {
-                    root.wxError = "Parse error"
+                    if (!root.silentWeatherRefresh)
+                        root.wxError = "Parse error"
                     root.wxLoading = false
                 }
+                root.silentWeatherRefresh = false
             }
         }
     }
@@ -389,14 +394,18 @@ stdout: SplitParser {
         tideTodosWriteProc.write(lines.join("\n"))
     }
 
-    Component.onCompleted: {
-        updateCalendar(calYear, calMonth)
-        loadCity(root.citySearch)
-    }
+    Component.onCompleted: updateCalendar(calYear, calMonth)
 
 onShowConditionChanged: {
         if (showCondition) {
-            if (weatherCode === -1 && !wxLoading) loadCity(root.citySearch)
+            if (weatherCode === -1 && !wxLoading) {
+                loadCity(root.citySearch)
+            } else if (!wxLoading && !weatherProc.running
+                       && (geoLat !== 0 || geoLon !== 0)
+                       && Date.now() - lastWeatherFetch > 1800000) {
+                silentWeatherRefresh = true
+                fetchWeather(geoLat, geoLon)
+            }
             if (!tideNotesLoaded) loadTideNotes()
             if (!tideTodosLoaded) loadTideTodos()
             clipModel.clear()

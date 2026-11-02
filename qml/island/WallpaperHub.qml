@@ -35,7 +35,6 @@ Item {
     readonly property int quickFooterHeight: 36   
     readonly property int quickCellWidth: 380        
     readonly property int quickCellHeight: 168        
-    readonly property int quickSkew: 26
     readonly property real quickNeighborScale: 0.74
 
     onViewModeChanged: viewModeFocusTimer.restart()

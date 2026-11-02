@@ -228,7 +228,7 @@ PanelWindow {
     }
     
     Timer {
-        interval: 3000; running: root.popupOpen; repeat: true; triggeredOnStart: true
+        interval: 50; running: root.popupOpen; repeat: false
         onTriggered: if (!hyprsunsetChecker.running) hyprsunsetChecker.running = true
     }
 

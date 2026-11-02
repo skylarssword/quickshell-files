@@ -11,10 +11,6 @@ Item {
 signal connectivityPanelRequested(string kind, bool open)
     signal screenshotPanelRequested(bool open)
     signal bluetoothExpandRequested()
-signal clearNotificationHistoryRequested()
-    signal notificationEntryActivated(var entry)
-signal dndToggleRequested()
-    property bool dndActive: false
 signal appearanceOpacityRequested(real value)
     signal appearanceWalColorToggleRequested(bool enabled)
 signal appearanceWalColorIndexRequested(int index)
@@ -48,7 +44,14 @@ signal bubblesToggleRequested()
     readonly property color capsuleWalColor: (capsuleWalColorIndex >= 0 && capsuleWalColorIndex < capsuleWalColors.length)
         ? capsuleWalColors[capsuleWalColorIndex]
         : "#000000"
-    readonly property real appearanceMenuTotalHeight: notificationPanelTotalHeight
+
+    readonly property real appearanceMenuTotalHeight: 24 + 28
+        + 3 * controlCenterColumn.spacing
+        + appearanceMenuContent.implicitHeight + 12
+        + dockSettingsContent.implicitHeight + 12
+        + islandSettingsContent.implicitHeight + 12
+
+    readonly property real appearanceMenuMaximumHeight: appearanceMenuTotalHeight + 96
 
     readonly property var userConfig: UserConfig
 
@@ -92,43 +95,8 @@ signal bubblesToggleRequested()
 property bool bluetoothPanelOpen: false
 property bool screenshotPanelOpen: false
    property bool batteryDrawerOpen: false
-property bool powerMenuOpen: false
 property bool gamemodeActive: false
-property bool notificationPanelOpen: false
-    property bool idleSettingsOpen: false
-    property var idleTimeouts: ({ dim: 480, lock: 600, displayoff: 660, suspend: 1800 })
 
-readonly property var idleOptions: [
-        { label: "Never",       value: -1 },
-        { label: "5 minutes",   value: 300 },
-        { label: "8 minutes",   value: 480 },
-        { label: "10 minutes",  value: 600 },
-        { label: "11 minutes",  value: 660 },
-        { label: "15 minutes",  value: 900 },
-        { label: "30 minutes",  value: 1800 },
-        { label: "45 minutes",  value: 2700 },
-        { label: "60 minutes",  value: 3600 },
-        { label: "120 minutes", value: 7200 }
-    ]
-
-    function idleOptionIndex(key) {
-        const val = idleTimeouts[key];
-        const idx = idleOptions.findIndex(o => o.value === val);
-        return idx >= 0 ? idx : 0;
-    }
-
-    function setIdleTimeout(key, seconds) {
-        idleTimeouts[key] = seconds;
-        idleTimeoutsChanged();
-        idleApplyExec.run(key, seconds);
-    }
-    property var notificationHistory: []
-    property int expandedNotificationIndex: -1
-
-    onNotificationHistoryChanged: {
-        if (notificationHistory.length === 0)
-            expandedNotificationIndex = -1
-    }
     property bool hyprsunsetActive: false
     property string screenshotMode: "area"
     property bool screenshotCapturing: false
@@ -198,7 +166,6 @@ property bool batteryDrawerDragging: false
     readonly property color textPrimary: IslandMotion.textPrimary
     readonly property color textSecondary: IslandMotion.textSecondary
     readonly property color cardAccent: StyleTokens.accent
-    readonly property color cardAccentPressed: StyleTokens.accentPressed
     readonly property color cardFillActive: StyleTokens.cardFillActive
     readonly property color cardFillHover: StyleTokens.cardFillHover
     readonly property color buttonFill: StyleTokens.buttonFill
@@ -213,23 +180,14 @@ property bool batteryDrawerDragging: false
     readonly property real batteryDrawerHandleHeight: 20
     readonly property real batteryDrawerContentGap: 8
     readonly property real batteryModeCardHeight: 80
-readonly property real controlCenterExtraHeight: powerMenuOpen
-        ? 0
-        : (12 + batteryDrawerHandleHeight
-            + batteryDrawerProgress * (batteryDrawerContentGap + batteryModeCardHeight))
-    readonly property real controlCenterMaximumExtraHeight: powerMenuOpen
-        ? 0
-        : (12 + batteryDrawerHandleHeight
-            + batteryDrawerContentGap + batteryModeCardHeight)
-
-   readonly property real powerMenuTotalHeight: 150
-   
-   readonly property real notificationPanelTotalHeight: controlCenterColumn.implicitHeight + 24
+readonly property real controlCenterExtraHeight: 12 + batteryDrawerHandleHeight
+        + batteryDrawerProgress * (batteryDrawerContentGap + batteryModeCardHeight)
+    readonly property real controlCenterMaximumExtraHeight: 12 + batteryDrawerHandleHeight
+        + batteryDrawerContentGap + batteryModeCardHeight
     readonly property bool bluetoothAvailable: !!bluetoothAdapter
     readonly property var bluetoothAdapter: Bluetooth.defaultAdapter
     readonly property var bluetoothDeviceValues: bluetoothAdapter ? bluetoothAdapter.devices.values : []
     readonly property bool wifiSupported: wifiController ? wifiController.supported : false
-    readonly property bool wifiReadOnly: wifiController ? wifiController.readOnly : true
     readonly property bool wifiAvailable: wifiController ? wifiController.available : false
     readonly property bool wifiEnabled: wifiController ? wifiController.enabled : false
     readonly property bool wifiBusy: wifiController ? wifiController.busy : false
@@ -260,7 +218,6 @@ readonly property real controlCenterExtraHeight: powerMenuOpen
     readonly property string bluetoothPairingMessage: bluetoothPairingAgent ? bluetoothPairingAgent.promptMessage : ""
     readonly property string bluetoothPairingDisplayedCode: bluetoothPairingAgent ? bluetoothPairingAgent.displayedCode : ""
     readonly property bool hasConnectivityPrompt: wifiPendingPasswordSsid.length > 0 || bluetoothPairingActive
-    readonly property bool anyConnectivityPanelOpen: wifiPanelOpen || bluetoothPanelOpen
     readonly property string wifiStatusText: wifiController ? wifiController.statusText : "Unavailable"
     readonly property string bluetoothStatusText: buildBluetoothStatusText()
     readonly property string bluetoothAvailabilityMessage: bluetoothAvailable ? "" : "No Bluetooth adapter is available."
@@ -876,28 +833,6 @@ function toggleScreenshotPanel() {
         bluetoothAdapter.enabled = !bluetoothAdapter.enabled;
     }
 
-    function toggleBluetoothScan() {
-        if (!bluetoothAdapter) {
-            bluetoothError = "No Bluetooth adapter is available.";
-            return;
-        }
-        if (!bluetoothEnabled) {
-            bluetoothError = "Turn on Bluetooth first.";
-            return;
-        }
-
-        bluetoothError = "";
-        if (bluetoothAdapter.discovering) {
-            bluetoothAdapter.discovering = false;
-            bluetoothInfoMessage = "";
-            bluetoothScanStopTimer.stop();
-        } else {
-            bluetoothAdapter.discovering = true;
-            bluetoothInfoMessage = "Scanning for nearby devices...";
-            bluetoothScanStopTimer.restart();
-        }
-    }
-
     function handleBluetoothDevicePressed(device) {
         if (!device) return;
         if (!bluetoothAdapter || !bluetoothEnabled) {
@@ -924,13 +859,6 @@ function toggleScreenshotPanel() {
         device.pair();
     }
 
-    function forgetBluetoothDevice(device) {
-        if (!device) return;
-        if (bluetoothPairAndConnectPath === device.dbusPath)
-            bluetoothPairAndConnectPath = "";
-        device.forget();
-    }
-
     anchors.fill: parent
     anchors.margins: 12
     opacity: showCondition ? 1 : 0
@@ -939,6 +867,21 @@ function toggleScreenshotPanel() {
 onBrightnessLevelChanged: syncBrightnessFromLevel(brightnessLevel)
     onVolumeLevelChanged: syncVolumeFromLevel(volumeLevel)
     onIsChargingChanged: if (showBatteryTime && !batteryTimeQuery.running) batteryTimeQuery.running = true
+    function resetTransientState() {
+        showBatteryTime = false;
+        batteryTimeText = "";
+        batteryDrawerSettleTimer.stop();
+        batteryDrawerSettling = false;
+        if (batteryDrawerOpen || batteryDrawerProgress > 0) {
+            batteryDrawerOpen = false;
+            batteryDrawerDragging = true;
+            batteryDrawerProgress = 0;
+            batteryDrawerDragging = false;
+        }
+    }
+
+    onVisibleChanged: if (!visible) resetTransientState()
+
     onShowConditionChanged: {
 if (showCondition) {
             syncLevelsFromProps();
@@ -958,9 +901,6 @@ if (showCondition) {
             displayedBrightness = localBrightness;
             displayedVolume = localVolume;
 closeConnectivityPanels();
-            powerMenuOpen = false;
-            notificationPanelOpen = false;
-            expandedNotificationIndex = -1;
             appearanceMenuOpen = false;
             screenshotPanelOpen = false;
             screenshotPanelRequested(false);
@@ -1052,19 +992,6 @@ closeConnectivityPanels();
         }
     }
 
-Process {
-        id: powerExec
-        function run(cmd) { command = ["bash", "-c", cmd]; running = true }
-    }
-
-    Process {
-        id: idleApplyExec
-        function run(key, seconds) {
-            command = ["set-hypridle", key, String(seconds)]
-            running = true
-        }
-    }
-
     Process {
         id: hyprsunsetExec
         
@@ -1080,15 +1007,6 @@ Process {
                 controlCenter.hyprsunsetActive = (data.trim() === "1")
             }
         }
-    }
-
-    Timer {
-        id: hyprsunsetTimer
-        interval: 2500       
-        running: true        
-        repeat: true         
-        triggeredOnStart: true 
-        onTriggered: hyprsunsetChecker.run()
     }
 
     Process {
@@ -1437,10 +1355,6 @@ Text {
                         hoverEnabled: true
                         onClicked: {
                             controlCenter.appearanceMenuOpen = !controlCenter.appearanceMenuOpen
-                            if (controlCenter.appearanceMenuOpen) {
-                                controlCenter.powerMenuOpen = false
-                                controlCenter.notificationPanelOpen = false
-                            }
                         }
                     }
                 }
@@ -1450,8 +1364,9 @@ Text {
 Item {
             width: parent.width
             height: 80
-visible: !controlCenter.powerMenuOpen && !controlCenter.notificationPanelOpen && !controlCenter.appearanceMenuOpen
-            opacity: (controlCenter.powerMenuOpen || controlCenter.notificationPanelOpen || controlCenter.appearanceMenuOpen) ? 0 : 1
+visible: opacity > 0
+enabled: !controlCenter.appearanceMenuOpen
+            opacity: controlCenter.appearanceMenuOpen ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
             Row {
@@ -1742,8 +1657,9 @@ Rectangle {
 
 Item {
             id: batteryDrawer
-            visible: !controlCenter.powerMenuOpen && !controlCenter.notificationPanelOpen && !controlCenter.appearanceMenuOpen
-            opacity: (controlCenter.powerMenuOpen || controlCenter.notificationPanelOpen || controlCenter.appearanceMenuOpen) ? 0 : 1
+            visible: opacity > 0
+            enabled: !controlCenter.appearanceMenuOpen
+            opacity: controlCenter.appearanceMenuOpen ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             readonly property real cardWidth: (width - connectivityCardsRow.spacing) / 2
             readonly property real modeSlotWidth: 44
@@ -2280,605 +2196,99 @@ Rectangle {
             }
         }
 
-        Item {
-            id: powerMenuDrawer
+        ControlSliderCard {
+            id: brightnessCard
+            visible: opacity > 0
+            enabled: !controlCenter.appearanceMenuOpen
+            opacity: controlCenter.appearanceMenuOpen ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
-            height: controlCenter.powerMenuOpen ? powerMenuContent.height + 12 : 0
-            clip: true
+            height: 76
+            title: "Display"
+            iconText: controlCenter.brightnessIconGlyph
+            iconFontFamily: controlCenter.iconFontFamily
+            textFontFamily: controlCenter.textFontFamily
+            value: controlCenter.displayedBrightness
+            knobSize: controlCenter.sliderKnobSize
+            moduleColor: Qt.rgba(1,1,1,0.05)
+            moduleHover: Qt.rgba(1,1,1,0.09)
+            trackColor: controlCenter.trackColor
+            textPrimary: controlCenter.textPrimary
+            textSecondary: controlCenter.textSecondary
 
-            Behavior on height {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
-
-Rectangle {
-                id: powerMenuContent
-                anchors.top: parent.top
-                anchors.topMargin: 0
-                anchors.left: parent.left
-                anchors.right: parent.right
-                implicitHeight: powerRow.implicitHeight + 20
-                radius: 20
-                color: Qt.rgba(1,1,1,0.05)
-                border.width: 1
-                border.color: Qt.rgba(1,1,1,0.16)
-
-                Row {
-                    id: powerRow
-                    anchors.centerIn: parent
-                    spacing: 10
-                    height: 54
-
-                    Repeater {
-                        model: [
-                            { icon: "\uf023", label: "Lock",     cmd: "pidof hyprlock || hyprlock" },
-                            { icon: "\uf186", label: "Sleep",    cmd: "systemctl suspend" },
-                            { icon: "\uf011", label: "Logout",   cmd: "uwsm stop" },
-                            { icon: "\uf021", label: "Reboot",   cmd: "systemctl reboot" },
-                            { icon: "\uf08d", label: "Shutdown", cmd: "systemctl poweroff" }
-                        ]
-
-                        delegate: Column {
-                            required property var modelData
-                            spacing: 4
-
-Rectangle {
-                                width: 44
-                                height: 44
-                                radius: 14
-                                color: pwrItemMouse.containsMouse
-                                       ? Qt.rgba(1,1,1,0.09)
-                                       : Qt.rgba(1,1,1,0.05)
-                                border.color: pwrItemMouse.containsMouse
-                                              ? Qt.rgba(1,1,1,0.30)
-                                              : Qt.rgba(1,1,1,0.16)
-                                border.width: 1
-                                anchors.horizontalCenter: parent.horizontalCenter
-
-                                Behavior on color { ColorAnimation { duration: 130 } }
-                                Behavior on border.color { ColorAnimation { duration: 130 } }
-
-                                scale: pwrItemMouse.pressed ? 0.9 : 1.0
-                                Behavior on scale {
-                                    NumberAnimation { duration: 150; easing.type: Easing.OutBack }
-                                }
-
-                                Text {
-                                    renderType: Text.NativeRendering
-                                    anchors.centerIn: parent
-                                    text: modelData.icon
-                                    font.family: iconFontFamily
-                                    font.pixelSize: 18
-                                    color: IslandMotion.textPrimary
-                                }
-
-                                MouseArea {
-                                    id: pwrItemMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onClicked: {
-                                        controlCenter.powerMenuOpen = false
-                                        powerExec.run(modelData.cmd)
-                                    }
-                                }
-                            }
-
-Text {
-    renderType: Text.NativeRendering
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: modelData.label
-                                color: IslandMotion.textFaint
-                                font.pixelSize: 9
-                                font.family: textFontFamily
-                                font.weight: Font.Medium
-                            }
-                        }
-                    }
-                }
-
-            }
-        }
-
-        Item {
-            id: idleSettingsPanel
-            width: parent.width
-            height: controlCenter.powerMenuOpen ? idleSettingsContent.height : 0
-            clip: true
-
-            Behavior on height {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
-
-            Rectangle {
-                id: idleSettingsContent
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                implicitHeight: idleSettingsColumn.implicitHeight + 28
-                radius: 20
-                color: Qt.rgba(1,1,1,0.05)
-                border.width: 1
-                border.color: Qt.rgba(1,1,1,0.16)
-
-                Column {
-                    id: idleSettingsColumn
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.margins: 14
-                    spacing: 8
-
-Item {
-                        width: parent.width
-                        height: 26
-
-                        Text {
-                            renderType: Text.NativeRendering
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Idle Settings"
-                            color: IslandMotion.textSecondary
-                            font.pixelSize: 11
-                            font.family: textFontFamily
-                            font.weight: Font.Medium
-                        }
-
-                        Rectangle {
-                            id: idleHeaderToggleBtn
-                            width: 26
-                            height: 26
-                            radius: 13
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: controlCenter.idleSettingsOpen || idleHeaderToggleMouse.containsMouse
-                                   ? Qt.rgba(1,1,1,0.14) : Qt.rgba(1,1,1,0.08)
-                            border.width: 1
-                            border.color: controlCenter.idleSettingsOpen
-                                          ? Qt.rgba(1,1,1,0.4)
-                                          : (idleHeaderToggleMouse.containsMouse ? Qt.rgba(1,1,1,0.3) : Qt.rgba(1,1,1,0.2))
-
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                            Behavior on border.color { ColorAnimation { duration: 150 } }
-
-                            Text {
-                                renderType: Text.NativeRendering
-                                anchors.centerIn: parent
-                                text: "\u25BE"
-                                color: controlCenter.idleSettingsOpen ? IslandMotion.textPrimary : IslandMotion.textSecondary
-                                font.pixelSize: 12
-                                rotation: controlCenter.idleSettingsOpen ? 180 : 0
-                                Behavior on rotation { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-                                Behavior on color { ColorAnimation { duration: 150 } }
-                            }
-
-                            MouseArea {
-                                id: idleHeaderToggleMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: controlCenter.idleSettingsOpen = !controlCenter.idleSettingsOpen
-                            }
-                        }
-                    }
-
-                    Item {
-                        id: idleSettingsDrawer
-                        width: parent.width
-                        height: controlCenter.idleSettingsOpen ? idleColumn.implicitHeight : 0
-                        clip: true
-                        Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-
-                        Column {
-                            id: idleColumn
-                            width: parent.width
-                            spacing: 8
-                            topPadding: 4
-
-                            Repeater {
-                                model: [
-                                    { key: "dim",        label: "Dim Display" },
-                                    { key: "lock",       label: "Lock Screen" },
-                                    { key: "displayoff", label: "Turn Display Off" },
-                                    { key: "suspend",    label: "Suspend" }
-                                ]
-
-                                delegate: Row {
-                                    required property var modelData
-                                    width: idleColumn.width
-                                    spacing: 8
-
-Text {
-    renderType: Text.NativeRendering
-                                        width: 108
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData.label
-                                        color: controlCenter.textSecondary
-                                        font.pixelSize: 10
-                                        font.family: textFontFamily
-                                        font.weight: Font.Medium
-                                        elide: Text.ElideRight
-                                    }
-
-ComboBox {
-                                        id: idleCombo
-                                        width: idleColumn.width - 116
-                                        height: 30
-                                        model: controlCenter.idleOptions.map(o => o.label)
-                                        currentIndex: controlCenter.idleOptionIndex(modelData.key)
-                                        onActivated: index => {
-                                            controlCenter.setIdleTimeout(
-                                                modelData.key,
-                                                controlCenter.idleOptions[index].value
-                                            )
-                                        }
-
-                                        background: Rectangle {
-                                            radius: 10
-                                            color: idleCombo.hovered ? Qt.rgba(1,1,1,0.09) : Qt.rgba(1,1,1,0.05)
-                                            border.width: 1
-                                            border.color: idleCombo.popup.visible ? Qt.rgba(1,1,1,0.30) : Qt.rgba(1,1,1,0.16)
-                                            Behavior on color { ColorAnimation { duration: 120 } }
-                                            Behavior on border.color { ColorAnimation { duration: 120 } }
-                                        }
-
-                                        contentItem: Text {
-     renderType: Text.NativeRendering
-                                            text: idleCombo.displayText
-                                            color: IslandMotion.textSecondary
-                                            font.pixelSize: 11
-                                            font.family: controlCenter.textFontFamily
-                                            font.weight: Font.Medium
-                                            verticalAlignment: Text.AlignVCenter
-                                            leftPadding: 10
-                                            rightPadding: 22
-                                            elide: Text.ElideRight
-                                        }
-
-                                        indicator: Text {
-     renderType: Text.NativeRendering
-                                            text: "\u25BE"
-                                            color: IslandMotion.textSecondary
-                                            font.pixelSize: 10
-                                            anchors.right: parent.right
-                                            anchors.rightMargin: 10
-                                            anchors.verticalCenter: parent.verticalCenter
-                                        }
-
-                                        popup: Popup {
-                                            y: idleCombo.height + 4
-                                            width: idleCombo.width
-                                            implicitHeight: Math.min(contentItem.implicitHeight, 200)
-                                            padding: 4
-
-                                            background: Rectangle {
-                                                radius: 12
-                                                color: Qt.rgba(0.08, 0.08, 0.10, 0.97)
-                                                border.width: 1
-                                                border.color: Qt.rgba(1,1,1,0.16)
-                                            }
-
-                                            contentItem: ListView {
-                                                clip: true
-                                                implicitHeight: contentHeight
-                                                model: idleCombo.popup.visible ? idleCombo.delegateModel : null
-                                                currentIndex: idleCombo.highlightedIndex
-                                                ScrollIndicator.vertical: ScrollIndicator {}
-                                            }
-                                        }
-
-                                        delegate: ItemDelegate {
-                                            id: idleComboDelegate
-                                            width: idleCombo.width
-                                            height: 28
-                                            highlighted: idleCombo.highlightedIndex === index
-
-                                            background: Rectangle {
-                                                radius: 8
-                                                color: idleComboDelegate.highlighted ? Qt.rgba(1,1,1,0.10) : StyleTokens.transparent
-                                            }
-
-                                            contentItem: Text {
-     renderType: Text.NativeRendering
-                                                text: modelData
-                                                color: idleComboDelegate.highlighted ? IslandMotion.textPrimary : IslandMotion.textSecondary
-                                                font.pixelSize: 11
-                                                font.family: controlCenter.textFontFamily
-                                                font.weight: Font.Medium
-                                                verticalAlignment: Text.AlignVCenter
-                                                leftPadding: 10
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+            onInteractionStarted: {
+                if (controlCenter.sliderIntroPending) {
+                    sliderIntroTimer.stop();
+                    controlCenter.sliderIntroPending = false;
+                    controlCenter.displayedBrightness = controlCenter.localBrightness;
+                    controlCenter.displayedVolume = controlCenter.localVolume;
                 }
             }
+            onValueMoved: function(value) {
+                controlCenter.queueBrightness(value);
+            }
+            onCommitRequested: {
+                brightnessApplyTimer.stop();
+                controlCenter.flushBrightness(true);
+            }
+            onCancelRequested: SystemServices.requestBrightness()
         }
 
-        Item {
-            id: notificationPanelDrawer
+ControlSliderCard {
+            id: volumeCard
+            visible: opacity > 0
+            enabled: !controlCenter.appearanceMenuOpen
+            opacity: controlCenter.appearanceMenuOpen ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
-            height: controlCenter.notificationPanelOpen ? notificationPanelContent.height + 12 : 0
-            clip: true
+            height: 76
+            title: "Sound"
+            iconText: controlCenter.volumeIconGlyph
+            iconFontFamily: controlCenter.iconFontFamily
+            textFontFamily: controlCenter.textFontFamily
+            value: controlCenter.displayedVolume
+            knobSize: controlCenter.sliderKnobSize
+            moduleColor: Qt.rgba(1,1,1,0.05)
+            moduleHover: Qt.rgba(1,1,1,0.09)
+            trackColor: controlCenter.trackColor
+            textPrimary: controlCenter.textPrimary
+            textSecondary: controlCenter.textSecondary
 
-            Behavior on height {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
-
-Rectangle {
-                id: notificationPanelContent
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                implicitHeight: notifPanelColumn.implicitHeight + 28
-                radius: 20
-                color: Qt.rgba(1,1,1,0.05)
-                border.width: 1
-                border.color: Qt.rgba(1,1,1,0.16)
-
-                Column {
-                    id: notifPanelColumn
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.margins: 14
-                    spacing: 8
-
-Item {
-                        width: parent.width
-                        height: 24
-
-                        Text {
-                            renderType: Text.NativeRendering
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Notifications"
-                            color: controlCenter.textPrimary
-                            font.pixelSize: 13
-                            font.family: controlCenter.textFontFamily
-                            font.weight: Font.DemiBold
-                        }
-
-                        Row {
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 10
-
-                            Row {
-                                spacing: 6
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                Text {
-                                    renderType: Text.NativeRendering
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "DND"
-                                    color: controlCenter.textSecondary
-                                    font.pixelSize: 10
-                                    font.family: controlCenter.textFontFamily
-                                    font.weight: Font.Medium
-                                }
-
-                                Rectangle {
-                                    id: dndSwitchTrack
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 34
-                                    height: 20
-                                    radius: 10
-                                    color: controlCenter.dndActive ? StyleTokens.success : StyleTokens.switchOff
-
-                                    Behavior on color {
-                                        ColorAnimation { duration: StyleTokens.durationFast }
-                                    }
-
-                                    Rectangle {
-                                        width: 16
-                                        height: 16
-                                        radius: 8
-                                        y: 2
-                                        x: controlCenter.dndActive ? 16 : 2
-                                        color: StyleTokens.white
-
-                                        Behavior on x {
-                                            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: controlCenter.dndToggleRequested()
-                                    }
-                                }
-                            }
-
-                            Text {
-                                renderType: Text.NativeRendering
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Clear All"
-                                visible: controlCenter.notificationHistory.length > 0
-                                color: clearAllMouse.containsMouse ? "#ff6b6b" : controlCenter.textSecondary
-                                font.pixelSize: 11
-                                font.family: controlCenter.textFontFamily
-                                font.weight: Font.Medium
-
-                                MouseArea {
-                                    id: clearAllMouse
-                                    anchors.fill: parent
-                                    anchors.margins: -8
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: controlCenter.clearNotificationHistoryRequested()
-                                }
-                            }
-                        }
-                    }
-
-Item {
-                        width: parent.width
-                        height: controlCenter.notificationHistory.length > 0 ? 220 : 50
-
-                        Text {
-                            renderType: Text.NativeRendering
-                            anchors.centerIn: parent
-                            visible: controlCenter.notificationHistory.length === 0
-                            text: "No notifications yet"
-                            color: controlCenter.textSecondary
-                            font.pixelSize: 11
-                            font.family: controlCenter.textFontFamily
-                        }
-
-                        ListView {
-                            id: notifListView
-                            anchors.fill: parent
-                            visible: controlCenter.notificationHistory.length > 0
-                            clip: true
-                            spacing: 4
-                            model: controlCenter.notificationHistory.length
-                            boundsBehavior: Flickable.StopAtBounds
-
-                            delegate: Item {
-                                id: notifRow
-                                width: notifListView.width
-                                required property int index
-                                property var entry: controlCenter.notificationHistory[index] || {}
-                                readonly property bool isExpanded: controlCenter.expandedNotificationIndex === index
-                                readonly property bool hasBody: (entry.body || "") !== "" && entry.body !== entry.summary
-                                height: isExpanded ? (hasBody ? 96 : 64) : 44
-
-                                Behavior on height {
-                                    NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
-                                }
-
-                                function relativeTime() {
-                                    if (!entry.timestamp) return ""
-                                    const diffMs = Date.now() - entry.timestamp
-                                    const mins = Math.floor(diffMs / 60000)
-                                    if (mins < 1) return "now"
-                                    if (mins < 60) return mins + "m ago"
-                                    const hrs = Math.floor(mins / 60)
-                                    if (hrs < 24) return hrs + "h ago"
-                                    return Math.floor(hrs / 24) + "d ago"
-                                }
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: 2
-                                    radius: 12
-                                    clip: true
-                                    color: notifRowMouse.containsMouse || notifRow.isExpanded
-                                           ? Qt.rgba(1,1,1,0.09) : Qt.rgba(1,1,1,0.03)
-                                    Behavior on color { ColorAnimation { duration: 120 } }
-
-                                    Item {
-                                        width: 26; height: 26
-                                        anchors.left: parent.left
-                                        anchors.top: parent.top
-                                        anchors.margins: 9
-
-                                        Image {
-                                            id: notifIconImg
-                                            anchors.fill: parent
-                                            fillMode: Image.PreserveAspectFit
-                                            asynchronous: true; cache: true
-                                            visible: status === Image.Ready
-                                            source: notifRow.entry.appIcon && notifRow.entry.appIcon !== ""
-                                                    ? "file://" + notifRow.entry.appIcon : ""
-                                        }
-                                        Text {
-                                            renderType: Text.NativeRendering
-                                            anchors.centerIn: parent
-                                            visible: !notifIconImg.visible
-                                            text: "\uf0f3"
-                                            font.family: controlCenter.iconFontFamily
-                                            font.pixelSize: 13
-                                            color: controlCenter.textSecondary
-                                            opacity: 0.6
-                                        }
-                                    }
-
-                                    Text {
-                                        renderType: Text.NativeRendering
-                                        anchors.right: parent.right
-                                        anchors.top: parent.top
-                                        anchors.margins: 9
-                                        text: notifRow.relativeTime()
-                                        color: controlCenter.textSecondary
-                                        font.pixelSize: 9
-                                        font.family: controlCenter.textFontFamily
-                                        opacity: 0.6
-                                    }
-
-                                    Column {
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.top: parent.top
-                                        anchors.leftMargin: 44
-                                        anchors.rightMargin: 12
-                                        anchors.topMargin: 6
-                                        spacing: 2
-
-                                        Text {
-                                            renderType: Text.NativeRendering
-                                            width: parent.width
-                                            text: notifRow.entry.appName || ""
-                                            color: controlCenter.textPrimary
-                                            font.pixelSize: 11
-                                            font.weight: Font.DemiBold
-                                            font.family: controlCenter.textFontFamily
-                                            elide: Text.ElideRight
-                                        }
-                                        Text {
-                                            renderType: Text.NativeRendering
-                                            width: parent.width
-                                            text: notifRow.entry.summary || ""
-                                            color: controlCenter.textSecondary
-                                            font.pixelSize: 10
-                                            font.family: controlCenter.textFontFamily
-                                            elide: notifRow.isExpanded ? Text.ElideNone : Text.ElideRight
-                                            wrapMode: notifRow.isExpanded ? Text.WordWrap : Text.NoWrap
-                                            maximumLineCount: notifRow.isExpanded ? 2 : 1
-                                        }
-                                        Text {
-                                            renderType: Text.NativeRendering
-                                            width: parent.width
-                                            visible: notifRow.isExpanded && notifRow.hasBody
-                                            text: notifRow.entry.body || ""
-                                            color: controlCenter.textSecondary
-                                            opacity: 0.85
-                                            font.pixelSize: 10
-                                            font.family: controlCenter.textFontFamily
-                                            wrapMode: Text.WordWrap
-                                            maximumLineCount: 3
-                                            elide: Text.ElideRight
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        id: notifRowMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        onClicked: {
-                                            controlCenter.expandedNotificationIndex =
-                                                notifRow.isExpanded ? -1 : notifRow.index
-                                            controlCenter.notificationEntryActivated(notifRow.entry)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+            onInteractionStarted: {
+                if (controlCenter.sliderIntroPending) {
+                    sliderIntroTimer.stop();
+                    controlCenter.sliderIntroPending = false;
+                    controlCenter.displayedBrightness = controlCenter.localBrightness;
+                    controlCenter.displayedVolume = controlCenter.localVolume;
                 }
             }
+            onValueMoved: function(value) {
+                controlCenter.queueVolume(value);
+            }
+            onCommitRequested: {
+                volumeApplyTimer.stop();
+                controlCenter.flushVolume(true);
+            }
+            onCancelRequested: SystemServices.requestVolume()
         }
+    }
+
+    Column {
+        id: appearanceMenuColumn
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.topMargin: 28 + controlCenterColumn.spacing
+        spacing: controlCenterColumn.spacing
+        opacity: controlCenter.appearanceMenuOpen ? 1 : 0
+        enabled: controlCenter.appearanceMenuOpen
+        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
         Item {
             id: appearanceMenuDrawer
             width: parent.width
-            height: controlCenter.appearanceMenuOpen ? appearanceMenuContent.height + 12 : 0
+            height: appearanceMenuContent.implicitHeight + 12
             clip: true
-
-            Behavior on height {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
 
 Rectangle {
                 id: appearanceMenuContent
@@ -3041,7 +2451,7 @@ Rectangle {
                         width: parent.width
                         height: controlCenter.capsuleUseWalColor && controlCenter.capsuleWalColors.length > 0 ? 40 : 0
                         clip: true
-                        Behavior on height { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+
 
                         ListView {
                             id: walSwatchList
@@ -3153,12 +2563,8 @@ Rectangle {
         Item {
             id: dockSettingsDrawer
             width: parent.width
-            height: controlCenter.appearanceMenuOpen ? dockSettingsContent.height + 12 : 0
+            height: dockSettingsContent.implicitHeight + 12
             clip: true
-
-            Behavior on height {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
 
             Rectangle {
                 id: dockSettingsContent
@@ -3348,7 +2754,6 @@ Rectangle {
                                     : (pinBubbleMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
                             border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
-                            Behavior on height       { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                             Behavior on opacity      { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                             Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -3387,7 +2792,6 @@ Rectangle {
                                     : (smartBumpMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
                             border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
                             border.width: 1
-                            Behavior on height       { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                             Behavior on opacity      { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                             Behavior on color        { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -3468,12 +2872,8 @@ Rectangle {
         Item {
             id: islandSettingsDrawer
             width: parent.width
-            height: controlCenter.appearanceMenuOpen ? islandSettingsContent.height + 12 : 0
+            height: islandSettingsContent.implicitHeight + 12
             clip: true
-
-            Behavior on height {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
 
             Rectangle {
                 id: islandSettingsContent
@@ -3647,80 +3047,5 @@ MouseArea {
                 }
             }
         }
-
-        ControlSliderCard {
-            id: brightnessCard
-            visible: !controlCenter.powerMenuOpen && !controlCenter.notificationPanelOpen && !controlCenter.appearanceMenuOpen
-            opacity: (controlCenter.powerMenuOpen || controlCenter.notificationPanelOpen || controlCenter.appearanceMenuOpen) ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-            width: parent.width
-            height: 76
-            title: "Display"
-            iconText: controlCenter.brightnessIconGlyph
-            iconFontFamily: controlCenter.iconFontFamily
-            textFontFamily: controlCenter.textFontFamily
-            value: controlCenter.displayedBrightness
-            knobSize: controlCenter.sliderKnobSize
-            moduleColor: Qt.rgba(1,1,1,0.05)
-            moduleHover: Qt.rgba(1,1,1,0.09)
-            trackColor: controlCenter.trackColor
-            textPrimary: controlCenter.textPrimary
-            textSecondary: controlCenter.textSecondary
-
-            onInteractionStarted: {
-                if (controlCenter.sliderIntroPending) {
-                    sliderIntroTimer.stop();
-                    controlCenter.sliderIntroPending = false;
-                    controlCenter.displayedBrightness = controlCenter.localBrightness;
-                    controlCenter.displayedVolume = controlCenter.localVolume;
-                }
-            }
-            onValueMoved: function(value) {
-                controlCenter.queueBrightness(value);
-            }
-            onCommitRequested: {
-                brightnessApplyTimer.stop();
-                controlCenter.flushBrightness(true);
-            }
-            onCancelRequested: SystemServices.requestBrightness()
-        }
-
-ControlSliderCard {
-            id: volumeCard
-            visible: !controlCenter.powerMenuOpen && !controlCenter.notificationPanelOpen && !controlCenter.appearanceMenuOpen
-            opacity: (controlCenter.powerMenuOpen || controlCenter.notificationPanelOpen || controlCenter.appearanceMenuOpen) ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-            width: parent.width
-            height: 76
-            title: "Sound"
-            iconText: controlCenter.volumeIconGlyph
-            iconFontFamily: controlCenter.iconFontFamily
-            textFontFamily: controlCenter.textFontFamily
-            value: controlCenter.displayedVolume
-            knobSize: controlCenter.sliderKnobSize
-            moduleColor: Qt.rgba(1,1,1,0.05)
-            moduleHover: Qt.rgba(1,1,1,0.09)
-            trackColor: controlCenter.trackColor
-            textPrimary: controlCenter.textPrimary
-            textSecondary: controlCenter.textSecondary
-
-            onInteractionStarted: {
-                if (controlCenter.sliderIntroPending) {
-                    sliderIntroTimer.stop();
-                    controlCenter.sliderIntroPending = false;
-                    controlCenter.displayedBrightness = controlCenter.localBrightness;
-                    controlCenter.displayedVolume = controlCenter.localVolume;
-                }
-            }
-            onValueMoved: function(value) {
-                controlCenter.queueVolume(value);
-            }
-            onCommitRequested: {
-                volumeApplyTimer.stop();
-                controlCenter.flushVolume(true);
-            }
-            onCancelRequested: SystemServices.requestVolume()
-        }
     }
-
 }

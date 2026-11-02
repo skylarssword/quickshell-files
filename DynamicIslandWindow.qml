@@ -47,7 +47,7 @@ property bool gpuRecorderActive: false
 Process {
     id: gpuRecorderPoll
     property string _buf: ""
-  command: ["bash", "-c", "lsof -c gpu-screen-rec 2>/dev/null | grep -qE '\\.mp4|\\.mkv|\\.flv' && echo 1 || echo 0"]
+  command: ["bash", "-c", "for p in $(pgrep gpu-screen-rec 2>/dev/null); do ls -l /proc/$p/fd 2>/dev/null; done | grep -qE '[.](mp4|mkv|flv)' && echo 1 || echo 0"]
     stdout: SplitParser { onRead: gpuRecorderPoll._buf += data }
     onRunningChanged: {
         if (!running) {
@@ -66,6 +66,7 @@ Timer {
 }
 
  readonly property var userConfig: UserConfig
+readonly property string homeDir: Quickshell.env("HOME") || ""
 property bool gamemodeActive: false
 property bool pinned: false
 property bool sidebarEnabled: false
@@ -243,13 +244,10 @@ readonly property real controlCenterWindowHeight: {
             return 4 + 38 + 12
         if (!islandContainer.controlCenterLayerVisible && !islandContainer.lyricsControlCenterLayerVisible)
             return 0
-if (controlCenterLoader.item && controlCenterLoader.item.powerMenuOpen)
-            return 4 + controlCenterLoader.item.notificationPanelTotalHeight + 12
-        if (controlCenterLoader.item && controlCenterLoader.item.notificationPanelOpen)
-            return 4 + controlCenterLoader.item.notificationPanelTotalHeight + 12
-        if (controlCenterLoader.item && controlCenterLoader.item.appearanceMenuOpen)
-            return 4 + controlCenterLoader.item.appearanceMenuTotalHeight + 12
-        return 4 + 320 + root.controlCenterMaximumExtraHeight + 12
+const defaultHeight = 4 + 320 + root.controlCenterMaximumExtraHeight + 12
+        if (controlCenterLoader.item)
+            return Math.max(defaultHeight, 4 + controlCenterLoader.item.appearanceMenuMaximumHeight + 12)
+        return defaultHeight
     }
     readonly property real connectivityDetailGap: 16
     readonly property int connectivityDetailAnimationDuration: IslandMotion.standard
@@ -540,39 +538,33 @@ IslandClock {
         id: timeObj
     }
 
-Process {
-        id: walColorQuery
-        property string _buf: ""
-        command: ["bash", "-c", "cat \"$HOME/.cache/wal/colors\" 2>/dev/null"]
-        stdout: SplitParser { onRead: walColorQuery._buf += data + "\n" }
-        onRunningChanged: {
-            if (!running) {
-                const lines = walColorQuery._buf.trim().split("\n")
-                walColorQuery._buf = ""
-                const parsed = []
-                for (let i = 0; i < lines.length; i++) {
-                    const raw = lines[i].trim()
-                    if (/^#?[0-9A-Fa-f]{6}$/.test(raw))
-                        parsed.push(raw.startsWith("#") ? raw : ("#" + raw))
-                }
-                if (parsed.length > 0) {
-                    root.capsuleWalColors = parsed
-                    if (root.capsuleWalColorIndex >= parsed.length)
-                        root.capsuleWalColorIndex = 0
-                }
+FileView {
+        id: walColorFile
+        path: root.homeDir + "/.cache/wal/colors"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: walColorReloadTimer.restart()
+        onLoaded: {
+            const lines = walColorFile.text().trim().split("\n")
+            const parsed = []
+            for (let i = 0; i < lines.length; i++) {
+                const raw = lines[i].trim()
+                if (/^#?[0-9A-Fa-f]{6}$/.test(raw))
+                    parsed.push(raw.startsWith("#") ? raw : ("#" + raw))
+            }
+            if (parsed.length > 0) {
+                root.capsuleWalColors = parsed
+                if (root.capsuleWalColorIndex >= parsed.length)
+                    root.capsuleWalColorIndex = 0
             }
         }
     }
 
-Timer {
-        id: walColorPollTimer
-        interval: 4000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!walColorQuery.running) walColorQuery.running = true
-        }
+    Timer {
+        id: walColorReloadTimer
+        interval: 80
+        repeat: false
+        onTriggered: walColorFile.reload()
     }
 
     function toggleGamemode() {
@@ -585,87 +577,77 @@ Timer {
         command: ["bash", "-c", "~/.config/hypr/scripts/gamemode.sh"]
     }
 
-    Process {
-        id: gamemodePollQuery
-        property string _buf: ""
-        command: ["bash", "-c",
-            "[ -f \"$HOME/.config/ml4w/settings/gamemode-enabled\" ] && echo 1 || echo 0"]
-        stdout: SplitParser { onRead: gamemodePollQuery._buf += data }
-        onRunningChanged: {
-            if (!running) {
-                root.gamemodeActive = gamemodePollQuery._buf.trim() === "1"
-                gamemodePollQuery._buf = ""
-            }
-        }
+    FileView {
+        id: gamemodeFile
+        path: root.homeDir + "/.config/ml4w/settings/gamemode-enabled"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: gamemodeReloadTimer.restart()
+        onLoaded: root.gamemodeActive = true
+        onLoadFailed: root.gamemodeActive = false
     }
 
-Timer {
-        id: gamemodePollTimer
-        interval: 2000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!gamemodePollQuery.running) gamemodePollQuery.running = true
-        }
+    Timer {
+        id: gamemodeReloadTimer
+        interval: 80
+        repeat: false
+        onTriggered: gamemodeFile.reload()
     }
 
     property bool _pollReading: false
 
-    Process {
-        id: appearanceSettingsLoader
-        property string _buf: ""
-        command: ["bash", "-c",
-            "cat \"$HOME/.cache/quickshell/appearance-settings.json\" 2>/dev/null"]
-        stdout: SplitParser { onRead: appearanceSettingsLoader._buf += data }
-        onRunningChanged: {
-            if (!running) {
-                const raw = appearanceSettingsLoader._buf.trim()
-                appearanceSettingsLoader._buf = ""
-                if (raw.length > 0) {
-                    try {
-                        const parsed = JSON.parse(raw)
-                        
-                        if (!root.appearanceSettingsLoaded) {
-                            root._pollReading = true
-                            if (typeof parsed.mainBar_capsuleOpacity === "number")
-                                root.capsuleOpacity = parsed.mainBar_capsuleOpacity
-                            if (typeof parsed.mainBar_capsuleUseWalColor === "boolean")
-                                root.capsuleUseWalColor = parsed.mainBar_capsuleUseWalColor
-                            if (typeof parsed.mainBar_capsuleWalColorIndex === "number")
-                                root.capsuleWalColorIndex = parsed.mainBar_capsuleWalColorIndex
-                            if (typeof parsed.lyricsExpandedView === "boolean")
-                                root.lyricsExpandedView = parsed.lyricsExpandedView
-                            if (typeof parsed.bubblesEnabled === "boolean")
-                                root.bubblesEnabled = parsed.bubblesEnabled
-                            if (typeof parsed.dockEnabled === "boolean")
-                                root.dockEnabled = parsed.dockEnabled
-                            if (typeof parsed.dockMode === "string")
-                                root.dockMode = parsed.dockMode
-                            if (typeof parsed.idleMode === "boolean")
-                                root.idleMode = parsed.idleMode
-                            root._pollReading = false
-                        }
-                        
-                        if (typeof parsed.sidebarEnabled === "boolean")
-                            root.sidebarEnabled = parsed.sidebarEnabled
-                    } catch (e) {
-                        root._pollReading = false
-                        console.log("appearance-settings.json parse error:", e)
-                    }
+    function applyAppearanceSettings(rawText) {
+        const raw = String(rawText).trim()
+        if (raw.length > 0) {
+            try {
+                const parsed = JSON.parse(raw)
+
+                if (!root.appearanceSettingsLoaded) {
+                    root._pollReading = true
+                    if (typeof parsed.mainBar_capsuleOpacity === "number")
+                        root.capsuleOpacity = parsed.mainBar_capsuleOpacity
+                    if (typeof parsed.mainBar_capsuleUseWalColor === "boolean")
+                        root.capsuleUseWalColor = parsed.mainBar_capsuleUseWalColor
+                    if (typeof parsed.mainBar_capsuleWalColorIndex === "number")
+                        root.capsuleWalColorIndex = parsed.mainBar_capsuleWalColorIndex
+                    if (typeof parsed.lyricsExpandedView === "boolean")
+                        root.lyricsExpandedView = parsed.lyricsExpandedView
+                    if (typeof parsed.bubblesEnabled === "boolean")
+                        root.bubblesEnabled = parsed.bubblesEnabled
+                    if (typeof parsed.dockEnabled === "boolean")
+                        root.dockEnabled = parsed.dockEnabled
+                    if (typeof parsed.dockMode === "string")
+                        root.dockMode = parsed.dockMode
+                    if (typeof parsed.idleMode === "boolean")
+                        root.idleMode = parsed.idleMode
+                    root._pollReading = false
                 }
-                root.appearanceSettingsLoaded = true
+
+                if (typeof parsed.sidebarEnabled === "boolean")
+                    root.sidebarEnabled = parsed.sidebarEnabled
+            } catch (e) {
+                root._pollReading = false
+                console.log("appearance-settings.json parse error:", e)
             }
         }
+        root.appearanceSettingsLoaded = true
+    }
+
+    FileView {
+        id: appearanceSettingsFile
+        path: root.homeDir + "/.cache/quickshell/appearance-settings.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: appearanceReloadTimer.restart()
+        onLoaded: root.applyAppearanceSettings(appearanceSettingsFile.text())
+        onLoadFailed: root.appearanceSettingsLoaded = true
     }
 
     Timer {
-        id: sidebarSyncTimer
-        interval: 500; repeat: true; running: true; triggeredOnStart: false
-        onTriggered: {
-            if (!appearanceSettingsLoader.running)
-                appearanceSettingsLoader.running = true
-        }
+        id: appearanceReloadTimer
+        interval: 80
+        repeat: false
+        onTriggered: appearanceSettingsFile.reload()
     }
 
     Timer {
@@ -698,8 +680,6 @@ Timer {
     }
 
     Process { id: appearanceSettingsSaveExec }
-
-    Component.onCompleted: appearanceSettingsLoader.running = true
 
     FocusScope {
         id: islandContainer
@@ -776,14 +756,36 @@ property string mediaPlayerName: ""
         }
 
         Timer {
-            id: mediaWorkspacePollTimer
-            interval: 2000
-            running: islandContainer.activePlayer !== null
-            repeat: true
-            triggeredOnStart: true
+            id: mediaWorkspaceRefreshTimer
+            interval: 150
+            repeat: false
             onTriggered: {
-                if (!mediaWorkspaceQuery.running) mediaWorkspaceQuery.running = true
+                if (mediaWorkspaceQuery.running)
+                    mediaWorkspaceRefreshTimer.restart()
+                else
+                    mediaWorkspaceQuery.running = true
             }
+        }
+
+        Connections {
+            target: Hyprland
+            enabled: islandContainer.activePlayer !== null
+
+            function onRawEvent(event) {
+                const name = event && event.name ? String(event.name) : ""
+                if (name.indexOf("window") !== -1 && name.indexOf("activewindow") === -1)
+                    mediaWorkspaceRefreshTimer.restart()
+            }
+        }
+
+        onActivePlayerChanged: {
+            if (activePlayer !== null)
+                mediaWorkspaceRefreshTimer.restart()
+        }
+
+        Component.onCompleted: {
+            if (activePlayer !== null)
+                mediaWorkspaceRefreshTimer.restart()
         }
 
         function resolveMediaWorkspace(rawJson) {
@@ -894,7 +896,6 @@ readonly property bool capturingLayerVisible: !root.overviewVisible && islandSta
         readonly property string currentTrack: mediaController.currentTrack
         readonly property string currentArtist: mediaController.currentArtist
         readonly property string currentArtUrl: mediaController.currentArtUrl
-        readonly property bool mediaHasNoLyrics: mediaController.hasNoLyrics
         readonly property real trackProgress: mediaController.trackProgress
         readonly property string timePlayed: mediaController.timePlayed
         readonly property string timeTotal: mediaController.timeTotal
@@ -1762,10 +1763,6 @@ function showSearch() {
             stopAutoHideTimer();
         }
 
-        function hideEqualizer() {
-            if (islandState === "equalizer")
-                showExpandedPlayer(false);
-        }
 
         function showCustomCapsule() {
             if (!hasCustomLeftItems) {
@@ -1917,10 +1914,6 @@ case "capturing":
                 case "search":
                     return searchLoader.item ? searchLoader.item.capsuleHeight : 38;
 case "control_center":
-                    if (controlCenterLoader.item && controlCenterLoader.item.powerMenuOpen)
-                        return controlCenterLoader.item.notificationPanelTotalHeight
-                    if (controlCenterLoader.item && controlCenterLoader.item.notificationPanelOpen)
-                        return controlCenterLoader.item.notificationPanelTotalHeight
                     if (controlCenterLoader.item && controlCenterLoader.item.appearanceMenuOpen)
                         return controlCenterLoader.item.appearanceMenuTotalHeight
                     return 320 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterExtraHeight : 32);
@@ -2626,9 +2619,8 @@ SearchPillLayer {
             Loader {
                 id: controlCenterLoader
                 anchors.fill: parent
-                active: islandContainer.controlCenterLayerVisible || root.anyConnectivityDetailMounted
+                active: true
                 asynchronous: false
-                visible: active
 
 sourceComponent: Component {
                     ControlCenterLayer {
@@ -2643,10 +2635,6 @@ sourceComponent: Component {
                         volumeLevel: islandContainer.currentVolume
                         brightnessLevel: islandContainer.currentBrightness
                         currentWorkspace: islandContainer.currentWs
-notificationHistory: islandContainer.notificationHistory
-                        onClearNotificationHistoryRequested: islandContainer.clearNotificationHistory()
-dndActive: islandContainer.dndActive
-                        onDndToggleRequested: islandContainer.toggleDnd()
 capsuleOpacity: root.capsuleOpacity
                         capsuleUseWalColor: root.capsuleUseWalColor
                         capsuleWalColors: root.capsuleWalColors

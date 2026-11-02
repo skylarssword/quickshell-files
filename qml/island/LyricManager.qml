@@ -53,14 +53,6 @@ readonly property string currentLyric:  _currentLyric
         _backendStatus = "missing"
     }
 
-    function setPosition(positionMs) {
-        if (!_isSynced || _lines.length === 0) return
-        const idx = _findIndex(positionMs)
-        if (idx === _activeIndex) return
-        _activeIndex  = idx
-        _currentLyric = idx >= 0 ? (_lines[idx].text || "") : ""
-    }
-
 function applyManual(lrcOrPlainText, artist, title) {
         _artist = artist || _artist
         _title  = title  || _title

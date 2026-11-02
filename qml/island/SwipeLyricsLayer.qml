@@ -29,7 +29,6 @@ Item {
     readonly property int trayIconSpacing: 5
     readonly property int trayCount: trayRepeater.count
     readonly property real trayTotalWidth: trayCount > 0 ? (trayCount * (trayIconSize + trayIconSpacing)) + 8 : 0
-readonly property real trayReserved: 0
     property real minimumWidth: 220
     property real maximumWidth: minimumWidth
     property real horizontalPadding: 14

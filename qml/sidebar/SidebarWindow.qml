@@ -15,6 +15,8 @@ PanelWindow {
 
     readonly property var userConfig: UserConfig
 
+    readonly property string homeDir: Quickshell.env("HOME") || ""
+
     property bool sidebarEnabled: false
 
     property bool   dockEnabled: false
@@ -219,10 +221,6 @@ PanelWindow {
     
     visible: true
 
-    Behavior on exclusiveZone {
-        NumberAnimation { duration: IslandMotion.durationMedium; easing.type: Easing.OutCubic }
-    }
-
     mask: Region {
         x: Math.floor(sidePill.x)
         y: Math.floor(sidePill.y)
@@ -264,75 +262,74 @@ PanelWindow {
         }
     }
 
-    Process {
-        id: settingsQuery
-        property string _buf: ""
-        command: ["bash", "-c",
-            "cat \"$HOME/.cache/quickshell/appearance-settings.json\" 2>/dev/null"]
-        stdout: SplitParser { onRead: settingsQuery._buf += data }
-        onRunningChanged: {
-            if (!running) {
-                const raw = settingsQuery._buf.trim()
-                settingsQuery._buf = ""
-                if (raw.length > 0) {
-                    try {
-                        const p = JSON.parse(raw)
-                        if (typeof p.sidebarEnabled       === "boolean") root.sidebarEnabled      = p.sidebarEnabled
-                        if (typeof p.capsuleOpacity       === "number")  root.capsuleOpacityValue  = p.capsuleOpacity
-                        if (typeof p.capsuleUseWalColor   === "boolean") root.capsuleUseWalColor   = p.capsuleUseWalColor
-                        if (typeof p.capsuleWalColorIndex === "number")  root.capsuleWalColorIndex = p.capsuleWalColorIndex
-                    } catch (e) {}
-                }
+    FileView {
+        id: settingsFile
+        path: root.homeDir + "/.cache/quickshell/appearance-settings.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: if (!root._skipRead) settingsReloadTimer.restart()
+        onLoaded: {
+            const raw = settingsFile.text().trim()
+            if (raw.length > 0) {
+                try {
+                    const p = JSON.parse(raw)
+                    if (typeof p.sidebarEnabled       === "boolean") root.sidebarEnabled      = p.sidebarEnabled
+                    if (typeof p.capsuleOpacity       === "number")  root.capsuleOpacityValue  = p.capsuleOpacity
+                    if (typeof p.capsuleUseWalColor   === "boolean") root.capsuleUseWalColor   = p.capsuleUseWalColor
+                    if (typeof p.capsuleWalColorIndex === "number")  root.capsuleWalColorIndex = p.capsuleWalColorIndex
+                } catch (e) {}
             }
         }
-    }
-    Timer {
-        id: settingsPollTimer
-        interval: 600; running: true; repeat: true; triggeredOnStart: true
-        onTriggered: if (!settingsQuery.running && !root._skipRead) settingsQuery.running = true
     }
 
-    Process {
-        id: gamemodePollQuery
-        property string _buf: ""
-        command: ["bash", "-c",
-            "[ -f \"$HOME/.config/ml4w/settings/gamemode-enabled\" ] && echo 1 || echo 0"]
-        stdout: SplitParser { onRead: gamemodePollQuery._buf += data }
-        onRunningChanged: {
-            if (!running) {
-                root.gamemodeActive = gamemodePollQuery._buf.trim() === "1"
-                gamemodePollQuery._buf = ""
-            }
-        }
-    }
     Timer {
-        interval: 2000; running: true; repeat: true; triggeredOnStart: true
-        onTriggered: if (!gamemodePollQuery.running) gamemodePollQuery.running = true
+        id: settingsReloadTimer
+        interval: 80
+        repeat: false
+        onTriggered: if (!root._skipRead) settingsFile.reload()
     }
 
-    Process {
-        id: walColorQuery
-        property string _buf: ""
-        command: ["bash", "-c", "cat \"$HOME/.cache/wal/colors\" 2>/dev/null"]
-        stdout: SplitParser { onRead: walColorQuery._buf += data + "\n" }
-        onRunningChanged: {
-            if (!running) {
-                const lines = walColorQuery._buf.trim().split("\n")
-                walColorQuery._buf = ""
-                const parsed = lines.map(l => l.trim())
-                                    .filter(l => /^#?[0-9A-Fa-f]{6}$/.test(l))
-                                    .map(l => l.startsWith("#") ? l : "#" + l)
-                if (parsed.length > 0) {
-                    root.capsuleWalColors = parsed
-                    if (root.capsuleWalColorIndex >= parsed.length)
-                        root.capsuleWalColorIndex = 0
-                }
+    FileView {
+        id: gamemodeFile
+        path: root.homeDir + "/.config/ml4w/settings/gamemode-enabled"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: gamemodeReloadTimer.restart()
+        onLoaded: root.gamemodeActive = true
+        onLoadFailed: root.gamemodeActive = false
+    }
+
+    Timer {
+        id: gamemodeReloadTimer
+        interval: 80
+        repeat: false
+        onTriggered: gamemodeFile.reload()
+    }
+
+    FileView {
+        id: walColorFile
+        path: root.homeDir + "/.cache/wal/colors"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: walColorReloadTimer.restart()
+        onLoaded: {
+            const parsed = walColorFile.text().trim().split("\n")
+                                .map(l => l.trim())
+                                .filter(l => /^#?[0-9A-Fa-f]{6}$/.test(l))
+                                .map(l => l.startsWith("#") ? l : "#" + l)
+            if (parsed.length > 0) {
+                root.capsuleWalColors = parsed
+                if (root.capsuleWalColorIndex >= parsed.length)
+                    root.capsuleWalColorIndex = 0
             }
         }
     }
+
     Timer {
-        interval: 4000; running: true; repeat: true; triggeredOnStart: true
-        onTriggered: if (!walColorQuery.running) walColorQuery.running = true
+        id: walColorReloadTimer
+        interval: 80
+        repeat: false
+        onTriggered: walColorFile.reload()
     }
 
     property bool _skipRead: false
@@ -375,7 +372,10 @@ PanelWindow {
     Timer {
         id: skipReadTimer
         interval: 1500; repeat: false
-        onTriggered: root._skipRead = false
+        onTriggered: {
+            root._skipRead = false
+            settingsFile.reload()
+        }
     }
 
     HyprlandDispatch {
@@ -480,7 +480,7 @@ PanelWindow {
     }
 
     Timer {
-        interval: 30000; running: true; repeat: true; triggeredOnStart: true
+        interval: 30000; running: root.sidebarEnabled; repeat: true; triggeredOnStart: true
         onTriggered: {
             SystemServices.requestBrightness()
             SystemServices.requestVolume()
@@ -512,7 +512,7 @@ PanelWindow {
     }
 
     Timer {
-        interval: 60000; running: true; repeat: true; triggeredOnStart: true
+        interval: 60000; running: root.sidebarEnabled; repeat: true; triggeredOnStart: true
         onTriggered: if (!batteryQuery.running) batteryQuery.running = true
     }
 
@@ -583,6 +583,7 @@ PanelWindow {
         Behavior on height  { NumberAnimation { duration: IslandMotion.standard; easing.type: IslandMotion.easeArrive } }
         Behavior on color   { ColorAnimation  { duration: IslandMotion.durationMedium } }
         opacity: root.sidebarEnabled ? 1 : 0
+        visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: IslandMotion.durationMedium; easing.type: Easing.OutCubic } }
 
         Column {

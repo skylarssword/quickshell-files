@@ -48,7 +48,6 @@ Item {
         return Math.max(minCols, Math.min(maxCols, need))
     }
 
-    readonly property bool hasResults: true   
     readonly property int footerHeight: 18    
     readonly property int appGridHeight: gridTopMargin + (iconCellSize * gridRowCount) + gridBottomMargin + footerHeight
 
@@ -67,7 +66,6 @@ Item {
     readonly property bool isLoading: appCacheLoader.running
     property var filteredApps: []
     property var allApps: []
-    property var displayApps: filteredApps
 
     property var favoritesSet: ({})
 

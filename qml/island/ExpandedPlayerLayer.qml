@@ -32,15 +32,6 @@ Item {
     readonly property string cavaPausedColor: (walColors && walColors.colors && walColors.colors.color5) ? walColors.colors.color5 : "#202020"
     readonly property bool isPlaying: activePlayer && activePlayer.playbackState === MprisPlaybackState.Playing
 
-Timer {
-    interval: 16
-    running: true
-    repeat: true
-    onTriggered: {
-        console.log("len:", cavaLevels.length, cavaLevels)
-    }
-}
-
     Process {
         id: walColorsProc
         stdout: StdioCollector { id: walColorsOut }

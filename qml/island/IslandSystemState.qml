@@ -44,7 +44,6 @@ Item {
     property real currentCpuUsage: -1
     property real currentRamUsage: -1
     property var cavaLevels: [0, 0, 0, 0, 0, 0, 0, 0]
-    property var cavaLevelsSmooth: [0, 0, 0, 0, 0, 0, 0, 0]
     property var customLeftItems: []
 
     property string _lastChargeStatus: SysBackend.batteryStatus
