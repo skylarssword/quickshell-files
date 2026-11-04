@@ -234,6 +234,7 @@ PanelWindow {
         function toggleSearch(): void {
             appLauncher.toggle()
             if (appLauncher.launcherOpen) {
+                screenshotGallery.close()
                 musicPopup.close(); infoPopup.close()
                 notifCenter.close(); controlCenter.close(); powerMenu.close()
             }
@@ -241,14 +242,14 @@ PanelWindow {
         function toggleControlCenter(): void {
             controlCenter.toggle()
             if (controlCenter.popupOpen) {
-                appLauncher.close(); musicPopup.close()
+                appLauncher.close(); screenshotGallery.close(); musicPopup.close()
                 infoPopup.close(); notifCenter.close(); powerMenu.close()
             }
         }
         function togglePowerMenu(): void {
             powerMenu.toggle()
             if (powerMenu.popupOpen) {
-                appLauncher.close(); musicPopup.close()
+                appLauncher.close(); screenshotGallery.close(); musicPopup.close()
                 infoPopup.close(); notifCenter.close(); controlCenter.close()
             }
         }
@@ -256,7 +257,7 @@ PanelWindow {
             notifCenter.toggle()
             if (notifCenter.popupOpen) {
                 root.unreadCount = 0
-                appLauncher.close(); musicPopup.close()
+                appLauncher.close(); screenshotGallery.close(); musicPopup.close()
                 infoPopup.close(); controlCenter.close(); powerMenu.close()
             }
         }
@@ -383,8 +384,64 @@ PanelWindow {
         function go(id) { focusWorkspace(String(id)) }
     }
 
+    Timer {
+        id: screenshotDelayTimer
+        property string pendingMode: "area"
+        repeat: false
+        onTriggered: screenshotShooter.shoot(pendingMode)
+    }
+
+    Process {
+        id: screenshotShooter
+        function shoot(mode) {
+            let cmd = `
+                DIR="$HOME/Pictures/Screenshots"
+                mkdir -p "$DIR"
+                FILENAME="screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"
+                FINAL="$DIR/$FILENAME"
+                success=false
+                if [ "${mode}" = "screen" ]; then
+                    grim "$FINAL" && success=true
+                elif [ "${mode}" = "active" ]; then
+                    GEOM=$(hyprctl activewindow -j | python3 -c 'import json,sys; w=json.load(sys.stdin); print(f"{w[\\"at\\"][0]},{w[\\"at\\"][1]} {w[\\"size\\"][0]}x{w[\\"size\\"][1]}")' 2>/dev/null)
+                    if [ -n "$GEOM" ]; then
+                        grim -g "$GEOM" "$FINAL" && success=true
+                    else
+                        grimblast save active "$FINAL" && success=true
+                    fi
+                elif [ "${mode}" = "area" ]; then
+                    grimblast save area "$FINAL" && success=true
+                fi
+                if [ "$success" = true ] && [ -f "$FINAL" ]; then
+                    wl-copy < "$FINAL"
+                    notify-send -a "Screenshot" -i "$FINAL" "Saved & copied" "$FILENAME"
+                    echo "$FINAL"
+                fi
+            `
+            command = ["bash", "-c", cmd]
+            running = true
+        }
+    }
+
     SidebarAppLauncher {
         id: appLauncher
+        gamemodeActive:      root.gamemodeActive
+        useWalColor:         root.capsuleUseWalColor
+        walColor:            root.capsuleWalColor
+        capsuleOpacityValue: root.capsuleOpacityValue
+        iconFontFamily:      root.userConfig.iconFontFamily
+        textFontFamily:      root.userConfig.textFontFamily
+
+        onScreenshotModeRequested: function(mode) {
+            screenshotDelayTimer.pendingMode = mode
+            screenshotDelayTimer.interval = mode === "active" ? 1500 : 150
+            screenshotDelayTimer.restart()
+        }
+        onScreenshotGalleryRequested: screenshotGallery.open()
+    }
+
+    SidebarScreenshotGallery {
+        id: screenshotGallery
         gamemodeActive:      root.gamemodeActive
         useWalColor:         root.capsuleUseWalColor
         walColor:            root.capsuleWalColor
@@ -614,6 +671,7 @@ PanelWindow {
                     onClicked: {
                         appLauncher.toggle()
                         if (appLauncher.launcherOpen) {
+                            screenshotGallery.close()
                             musicPopup.close()
                             controlCenter.close()
                         }
@@ -725,7 +783,7 @@ PanelWindow {
                 onToggled: {
                     musicPopup.toggle()
                     if (musicPopup.popupOpen) {
-                        appLauncher.close()
+                        appLauncher.close(); screenshotGallery.close()
                         infoPopup.close()
                         controlCenter.close()
                     }
@@ -746,7 +804,7 @@ PanelWindow {
                 onToggled: {
                     infoPopup.toggle()
                     if (infoPopup.popupOpen) {
-                        appLauncher.close()
+                        appLauncher.close(); screenshotGallery.close()
                         musicPopup.close()
                         notifCenter.close()
                     }
@@ -828,7 +886,7 @@ PanelWindow {
                         notifCenter.toggle()
                         if (notifCenter.popupOpen) {
                             root.unreadCount = 0
-                            appLauncher.close()
+                            appLauncher.close(); screenshotGallery.close()
                             musicPopup.close()
                             infoPopup.close()
                             controlCenter.close()
@@ -847,7 +905,7 @@ PanelWindow {
                 onToggled: {
                     controlCenter.toggle()
                     if (controlCenter.popupOpen) {
-                        appLauncher.close()
+                        appLauncher.close(); screenshotGallery.close()
                         musicPopup.close()
                         infoPopup.close()
                         notifCenter.close()
@@ -865,7 +923,7 @@ PanelWindow {
                 onToggled: {
                     powerMenu.toggle()
                     if (powerMenu.popupOpen) {
-                        appLauncher.close()
+                        appLauncher.close(); screenshotGallery.close()
                         musicPopup.close()
                         infoPopup.close()
                         notifCenter.close()

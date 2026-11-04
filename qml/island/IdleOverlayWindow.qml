@@ -19,6 +19,7 @@ PanelWindow {
         verticalOffset: 1
         spread: 0.15
         opacity: 0.6
+        cached: true
     }
 
     property var hyprMonitor: null
@@ -341,6 +342,8 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
         anchors.fill: parent
         opacity: idleWindow.contentVisible ? 1 : 0
         visible: opacity > 0
+        layer.enabled: true
+        layer.effect: TextShadow {}
 
         Behavior on opacity {
             NumberAnimation { duration: 220; easing.type: Easing.InOutQuad }
@@ -385,8 +388,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     font.pixelSize: 34
                     font.family: idleWindow.flexRoundedFamily
                     font.letterSpacing: -0.6
-                    layer.enabled: true
-                    layer.effect: TextShadow {}
                     font.weight: Font.Bold
                 }
 
@@ -400,8 +401,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     opacity: 1
                     font.pixelSize: 15
                     font.family: idleWindow.flexRoundedFamily
-                    layer.enabled: true
-                    layer.effect: TextShadow {}
                     font.weight: Font.Medium
                 }
             }
@@ -413,8 +412,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                 radius: 2.5
                 color: "white"
                 opacity: 1
-                layer.enabled: true
-                layer.effect: TextShadow {}
             }
 
             Row {
@@ -429,8 +426,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     font.pixelSize: 19
                     font.family: idleWindow.flexRoundedFamily
                     font.letterSpacing: 0.8
-                    layer.enabled: true
-                    layer.effect: TextShadow {}
                 }
 
                 Text {
@@ -441,8 +436,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     font.pixelSize: 22
                     font.family: idleWindow.flexRoundedFamily
                     font.letterSpacing: -0.2
-                    layer.enabled: true
-                    layer.effect: TextShadow {}
                     font.weight: Font.Medium
                 }
 
@@ -453,8 +446,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     color: "white"
                     font.pixelSize: 19
                     font.family: idleWindow.flexRoundedFamily
-                    layer.enabled: true
-                    layer.effect: TextShadow {}
                 }
             }
         }
@@ -487,8 +478,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         Behavior on color { ColorAnimation { duration: 300 } }
                         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
 
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
 
                         MouseArea {
                             anchors.fill: parent
@@ -507,8 +496,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                 font.pixelSize: 15
                 font.family: idleWindow.flexRoundedFamily
                 Behavior on color { ColorAnimation { duration: 300 } }
-                layer.enabled: true
-                layer.effect: TextShadow {}
             }
         }
 
@@ -532,8 +519,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     font.pixelSize: 16
                     color: idleWindow.adaptiveOnWallpaperColor
                     Behavior on color { ColorAnimation { duration: 300 } }
-                    layer.enabled: true
-                    layer.effect: TextShadow {}
                 }
 
                 Rectangle {
@@ -551,8 +536,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         color: "white"
                         font.pixelSize: 9
                         font.family: idleWindow.flexRoundedFamily
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
                 }
             }
@@ -574,8 +557,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                     Behavior on color { ColorAnimation { duration: 300 } }
                     Behavior on opacity { NumberAnimation { duration: 150 } }
                     Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
-                    layer.enabled: true
-                    layer.effect: TextShadow {}
                 }
 
                 MouseArea {
@@ -625,8 +606,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         color: "white"
                         font.pixelSize: 12
                         font.family: idleWindow.flexRoundedFamily
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
 
                     Rectangle {
@@ -666,8 +645,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         color: "white"
                         font.pixelSize: 12
                         font.family: idleWindow.flexRoundedFamily
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
 
                     Rectangle {
@@ -704,8 +681,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         color: "white"
                         font.pixelSize: 12
                         font.family: idleWindow.flexRoundedFamily
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
 
                     Rectangle {
@@ -814,8 +789,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                             wrapMode: Text.WordWrap
                             maximumLineCount: 2
                             elide: Text.ElideRight
-                            layer.enabled: true
-                            layer.effect: TextShadow {}
                         }
 
                         Text {
@@ -829,8 +802,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                             wrapMode: Text.WordWrap
                             maximumLineCount: 2
                             elide: Text.ElideRight
-                            layer.enabled: true
-                            layer.effect: TextShadow {}
                         }
                     }
                 }
@@ -849,8 +820,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         opacity: 0.6
                         font.pixelSize: 10
                         font.family: idleWindow.flexRoundedFamily
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
 
                     Rectangle {
@@ -911,8 +880,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         opacity: 0.6
                         font.pixelSize: 10
                         font.family: idleWindow.flexRoundedFamily
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
                 }
 
@@ -935,8 +902,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         font.family: idleWindow.flexRoundedFamily
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
 
                     Text {
@@ -950,8 +915,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         wrapMode: Text.WordWrap
                         maximumLineCount: 2
                         elide: Text.ElideRight
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
 
                     Text {
@@ -964,8 +927,6 @@ readonly property string iconFontFamily: UserConfig.iconFontFamily
                         font.family: idleWindow.flexRoundedFamily
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
-                        layer.enabled: true
-                        layer.effect: TextShadow {}
                     }
                 }
 

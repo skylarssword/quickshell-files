@@ -186,10 +186,17 @@ Region {
             height: screenshotDetailShell.visible ? Math.ceil(screenshotDetailShell.height) : 0
         }
     }
-implicitHeight: Math.max(
+// Keep the surface permanently tall enough to hold the control center.
+    // This prevents implicitHeight from changing when the CC opens/closes,
+    // which is what causes the 1-pixel compositor reflow on the bar and bubbles.
+// Surface is permanently tall enough to hold the CC in any sub-panel state.
+    // Hardcoded ceiling avoids live bindings on item implicitHeight which
+    // cause constant repaints. 800px comfortably covers all sub-panels.
+    readonly property real ccMaxHeight: 800
+    implicitHeight: Math.max(
         root.overviewVisible ? Math.ceil(4 + root.overviewCapsuleHeight + 8) : 0,
         Math.ceil(4 + root.connectivityDetailHeight + 12),
-        Math.ceil(root.controlCenterWindowHeight)
+        root.ccMaxHeight
     )
 exclusiveZone: (root.idleMode || root.sidebarEnabled) ? 0 : (root.gamemodeActive ? 60 : 35)
     aboveWindows: true
@@ -239,15 +246,13 @@ property bool wifiConnectivityDetailOpen: false
     readonly property real controlCenterMaximumExtraHeight: controlCenterLoader.item
         ? controlCenterLoader.item.controlCenterMaximumExtraHeight
         : 120
-readonly property real controlCenterWindowHeight: {
+// Fixed maximum height while CC is open — avoids implicitHeight jumps that jolt the bar.
+    readonly property real controlCenterWindowHeight: {
         if (islandContainer.capturingLayerVisible)
             return 4 + 38 + 12
         if (!islandContainer.controlCenterLayerVisible && !islandContainer.lyricsControlCenterLayerVisible)
             return 0
-const defaultHeight = 4 + 320 + root.controlCenterMaximumExtraHeight + 12
-        if (controlCenterLoader.item)
-            return Math.max(defaultHeight, 4 + controlCenterLoader.item.appearanceMenuMaximumHeight + 12)
-        return defaultHeight
+        return 4 + 320 + root.controlCenterMaximumExtraHeight + 12
     }
     readonly property real connectivityDetailGap: 16
     readonly property int connectivityDetailAnimationDuration: IslandMotion.standard
@@ -2619,7 +2624,7 @@ SearchPillLayer {
             Loader {
                 id: controlCenterLoader
                 anchors.fill: parent
-                active: islandContainer.someLayerVisible
+                active: true
                 asynchronous: false
 
 sourceComponent: Component {
@@ -2627,7 +2632,7 @@ sourceComponent: Component {
                         iconFontFamily: root.iconFontFamily
                         textFontFamily: root.textFontFamily
                         heroFontFamily: root.heroFontFamily
-                        sliderIntroDelay: mainCapsule.morphDuration
+                        sliderIntroDelay: 0
                         currentTime: timeObj.currentTime
                         currentDateLabel: timeObj.currentDateLabel
                         batteryCapacity: islandContainer.batteryCapacity

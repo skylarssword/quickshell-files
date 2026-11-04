@@ -1,5 +1,6 @@
 SidebarWindow 1.0 SidebarWindow.qml
 SidebarAppLauncher 1.0 SidebarAppLauncher.qml
+SidebarScreenshotGallery 1.0 SidebarScreenshotGallery.qml
 SidebarMusicWidget 1.0 SidebarMusicWidget.qml
 SidebarMusicPopup 1.0 SidebarMusicPopup.qml
 SidebarClockWidget 1.0 SidebarClockWidget.qml

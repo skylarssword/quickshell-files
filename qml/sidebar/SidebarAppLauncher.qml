@@ -26,6 +26,9 @@ PanelWindow {
 
     property bool launcherOpen: false
 
+    signal screenshotModeRequested(string mode)
+    signal screenshotGalleryRequested()
+
     function open()  { launcherOpen = true  }
     function close() { launcherOpen = false }
     function toggle(){ launcherOpen = !launcherOpen }
@@ -108,6 +111,15 @@ PanelWindow {
                 if (isCmd) launchExec.run(exec)
                 else       launchExec.launch(exec)
                 root.close()
+            }
+
+            onScreenshotModeRequested: function(mode) {
+                root.close()
+                root.screenshotModeRequested(mode)
+            }
+            onScreenshotGalleryRequested: {
+                root.close()
+                root.screenshotGalleryRequested()
             }
 
             onCapsuleWidthChanged:  capsule.width  = capsuleWidth

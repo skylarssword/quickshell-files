@@ -242,21 +242,21 @@ Item {
         }
     }
 
-    scale: showCondition ? 1.0 : 0.12
-    transformOrigin: Item.Top
     anchors.fill: parent
     anchors.margins: 12
-    opacity: showCondition ? 1 : 0
-    visible: opacity > 0
+    // No scale or fade: appear/disappear instantly with the capsule morph.
+    // Warm-up: 1% opacity for 1.2s at startup so Qt builds textures early.
+    property bool warmedUp: false
+    opacity: showCondition ? 1 : (warmedUp ? 0 : 0.01)
+    visible: true
+    enabled: showCondition
 
-    Behavior on scale {
-        NumberAnimation { duration: 400; easing.type: Easing.OutQuint }
-    }
-    Behavior on opacity {
-        NumberAnimation {
-            duration: showCondition ? 240 : 100
-            easing.type: Easing.InOutQuad
-        }
+    Timer {
+        id: lccWarmUpTimer
+        interval: 1200
+        running: true
+        repeat: false
+        onTriggered: controlCenter.warmedUp = true
     }
 
     function buildLrclibStatus() {

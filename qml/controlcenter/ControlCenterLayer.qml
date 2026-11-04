@@ -59,16 +59,7 @@ signal bubblesToggleRequested()
     property string iconFontFamily: userConfig.iconFontFamily
     property string textFontFamily: userConfig.textFontFamily
     property string heroFontFamily: userConfig.heroFontFamily
-   
-    scale: showCondition ? 1.0 : 0.12
-    transformOrigin: Item.Top
 
-    Behavior on scale {
-        NumberAnimation {
-            duration: IslandMotion.micro
-            easing.type: IslandMotion.easeArrive
-        }
-    }
     property string currentTime: "00:00"
     property string currentDateLabel: ""
     property int batteryCapacity: 0
@@ -861,8 +852,23 @@ function toggleScreenshotPanel() {
 
     anchors.fill: parent
     anchors.margins: 12
-    opacity: showCondition ? 1 : 0
-    visible: opacity > 0
+    // Kept visible (but transparent and non-interactive) while closed, so its
+    // scene-graph nodes, glyphs and textures exist before the first open.
+    // For the first ~1.2s after startup it renders at 1% opacity (effectively
+    // invisible) so Qt really builds and uploads everything; Qt may skip
+    // fully transparent (opacity 0) subtrees, which would defeat the warm-up.
+    property bool warmedUp: false
+    opacity: showCondition ? 1 : (warmedUp ? 0 : 0.01)
+    visible: true
+    enabled: showCondition
+
+    Timer {
+        id: warmUpTimer
+        interval: 1200
+        running: true
+        repeat: false
+        onTriggered: controlCenter.warmedUp = true
+    }
 
 onBrightnessLevelChanged: syncBrightnessFromLevel(brightnessLevel)
     onVolumeLevelChanged: syncVolumeFromLevel(volumeLevel)
@@ -880,8 +886,6 @@ onBrightnessLevelChanged: syncBrightnessFromLevel(brightnessLevel)
         }
     }
 
-    onVisibleChanged: if (!visible) resetTransientState()
-
     onShowConditionChanged: {
 if (showCondition) {
             syncLevelsFromProps();
@@ -890,13 +894,11 @@ if (showCondition) {
             displayedVolume = localVolume;
             sliderIntroTimer.interval = sliderIntroDelay;
             sliderIntroTimer.restart();
-            refreshBatteryModeState();
-            requestWifiStateRefresh();
-            hyprsunsetChecker.running = true;
-            if (wifiPanelOpen && wifiSupported && wifiEnabled)
-                requestWifiListRefresh(true);
+            openRefreshTimer.restart();
 } else {
+            resetTransientState();
             sliderIntroTimer.stop();
+            openRefreshTimer.stop();
             sliderIntroPending = false;
             displayedBrightness = localBrightness;
             displayedVolume = localVolume;
@@ -916,15 +918,10 @@ closeConnectivityPanels();
         refreshBatteryModeState();
     }
 
-    Behavior on opacity {
-        SequentialAnimation {
-            PauseAnimation { duration: showCondition ? IslandMotion.contentEnterDelay : 0 }
-            NumberAnimation {
-                duration: showCondition ? IslandMotion.contentEnterDuration : IslandMotion.contentExitDuration
-                easing.type: showCondition ? IslandMotion.easeMove : IslandMotion.easeOut
-            }
-        }
-    }
+    // No fade on opacity: the other layers (power menu, player, ...) are created
+    // and destroyed with their state, so their content appears and disappears
+    // instantly. A fade here made the control center linger over the next layer
+    // on close and arrive ~400ms late on open.
 
     Behavior on displayedBrightness {
         enabled: controlCenter.showCondition && !controlCenter.sliderIntroPending && !brightnessCard.pressed
@@ -1053,6 +1050,23 @@ closeConnectivityPanels();
         interval: 55
         repeat: false
         onTriggered: controlCenter.flushVolume(false)
+    }
+
+    // Runs the state refreshes (battery, wifi, hyprsunset) after the capsule
+    // has finished morphing so process spawns don't compete with the first frames.
+    Timer {
+        id: openRefreshTimer
+        interval: IslandMotion.standard
+        repeat: false
+
+        onTriggered: {
+            if (!controlCenter.showCondition) return;
+            controlCenter.refreshBatteryModeState();
+            controlCenter.requestWifiStateRefresh();
+            hyprsunsetChecker.running = true;
+            if (controlCenter.wifiPanelOpen && controlCenter.wifiSupported && controlCenter.wifiEnabled)
+                controlCenter.requestWifiListRefresh(true);
+        }
     }
 
     Timer {
