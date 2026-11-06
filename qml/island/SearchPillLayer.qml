@@ -39,7 +39,7 @@ Item {
 
     readonly property int minCols: 6
     readonly property int maxCols: 10
-    readonly property int appCountForLayout: (isWallpaperMode || isScreenshotMode)
+    readonly property int appCountForLayout: (isWallpaperMode || isScreenshotMode || isAnimeMode)
         ? 0
         : (filteredApps.length > 0 ? filteredApps.length : allApps.length)
     readonly property int gridCols: {
@@ -51,12 +51,16 @@ Item {
     readonly property int footerHeight: 18    
     readonly property int appGridHeight: gridTopMargin + (iconCellSize * gridRowCount) + gridBottomMargin + footerHeight
 
-    property int capsuleWidth: isWallpaperMode
+    property int capsuleWidth: isAnimeMode
+        ? (animeHubLoader.item ? animeHubLoader.item.capsuleWidth : 640)
+        : isWallpaperMode
         ? (wallpaperHubLoader.item
             ? (wallpaperHubLoader.item.viewMode, wallpaperHubLoader.item.capsuleWidth)
             : 700)
         : (isScreenshotMode ? 340 : Math.max(620, gridCols * iconCellSize + gridSideMargin * 2))
-    property int capsuleHeight: isWallpaperMode
+    property int capsuleHeight: isAnimeMode
+        ? (animeHubLoader.item ? root.inputRowHeight + animeHubLoader.item.capsuleHeight : (inputRowHeight + 380))
+        : isWallpaperMode
         ? (wallpaperHubLoader.item
             ? (wallpaperHubLoader.item.viewMode, root.inputRowHeight + wallpaperHubLoader.item.capsuleHeight)
             : (inputRowHeight + 334))
@@ -128,6 +132,11 @@ Item {
                q.startsWith("wallpaper ") || q.startsWith("wp ")
     }
 
+    readonly property bool isAnimeMode: {
+        let q = searchText.trim().toLowerCase()
+        return q === "anime" || q === "ani-cli" || q.startsWith("anime ")
+    }
+
     readonly property bool isScreenshotMode: {
         let q = searchText.trim().toLowerCase()
         return q === "sc" || q === "screenshot" || q === "screenshots" || q === "ss"
@@ -143,6 +152,26 @@ Item {
             searchInput.text = ""
             root.searchText = ""
             searchInput.forceActiveFocus()
+        }
+    }
+
+    onIsAnimeModeChanged: {
+        if (isAnimeMode) {
+            isCommandMode = false
+            animeFocusTimer.restart()
+        } else {
+            searchInput.text = ""
+            root.searchText = ""
+            searchInput.forceActiveFocus()
+        }
+    }
+
+    Timer {
+        id: animeFocusTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            if (animeHubLoader.item) animeHubLoader.item.focusInput()
         }
     }
 
@@ -212,7 +241,9 @@ Item {
     }
 
     function inputHasFocus() {
-        return searchInput.activeFocus || (wallpaperHubLoader.item && wallpaperHubLoader.item.inputHasFocus && wallpaperHubLoader.item.inputHasFocus())
+        return searchInput.activeFocus
+            || (wallpaperHubLoader.item && wallpaperHubLoader.item.inputHasFocus && wallpaperHubLoader.item.inputHasFocus())
+            || (animeHubLoader.item && animeHubLoader.item.inputHasFocus && animeHubLoader.item.inputHasFocus())
     }
 
     onVisibleChanged: {
@@ -221,6 +252,7 @@ Item {
             selectedIndex = 0
             loadApps()
             if (root.isWallpaperMode) wallpaperFocusTimer.restart()
+            else if (root.isAnimeMode) animeFocusTimer.restart()
             else searchInput.forceActiveFocus()
         }
     }
@@ -232,7 +264,7 @@ Item {
     }
 
     function rebuildFiltered() {
-        if (isWallpaperMode || isScreenshotMode) {
+        if (isWallpaperMode || isScreenshotMode || isAnimeMode) {
             return
         }
 
@@ -264,7 +296,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         propagateComposedEvents: true
-        enabled: !root.isWallpaperMode
+        enabled: !root.isWallpaperMode && !root.isAnimeMode
         onEntered: searchInput.forceActiveFocus()
         onClicked: (mouse) => mouse.accepted = false
         onPressed: (mouse) => mouse.accepted = false
@@ -287,7 +319,7 @@ Item {
 
                 Text {
                     renderType: Text.NativeRendering
-                    text: root.isCommandMode ? "\uf120" : "\uf002"
+                    text: root.isAnimeMode ? "\uf008" : (root.isCommandMode ? "\uf120" : "\uf002")
                     font.family: root.iconFontFamily
                     font.pixelSize: 14
                     color: root.isCommandMode ? "#a78bfa" : "white"
@@ -308,7 +340,7 @@ Item {
                     activeFocusOnPress: true
                     clip: true
                     
-                    enabled: !root.isWallpaperMode
+                    enabled: !root.isWallpaperMode && !root.isAnimeMode
 
                     onTextChanged: root.searchText = text
 
@@ -386,6 +418,23 @@ Item {
             }
         }
 
+        Loader {
+            id: animeHubLoader
+            width: parent.width
+            height: item ? item.height : 0
+            active: root.isAnimeMode
+            visible: active
+            asynchronous: false
+
+            sourceComponent: Component {
+                AnimeHub {
+                    iconFontFamily: root.iconFontFamily
+                    textFontFamily: root.textFontFamily
+                    onCloseRequested: root.closeRequested()
+                }
+            }
+        }
+
         Item {
             width: parent.width
             height: 56
@@ -441,7 +490,7 @@ Item {
         Item {
             width: parent.width
             height: root.appGridHeight
-            visible: root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode
+            visible: root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode && !root.isAnimeMode
 
             Column {
                 anchors.centerIn: parent
@@ -510,7 +559,7 @@ Item {
             height: root.appGridHeight - root.footerHeight
             anchors.leftMargin: root.gridSideMargin
             anchors.rightMargin: root.gridSideMargin
-            visible: !root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode
+            visible: !root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode && !root.isAnimeMode
             clip: true
 
             cellWidth: Math.floor((root.capsuleWidth - root.gridSideMargin * 2) / Math.max(1, root.gridCols))
@@ -637,7 +686,7 @@ Item {
             renderType: Text.NativeRendering
             width: parent.width
             height: root.footerHeight
-            visible: !root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode
+            visible: !root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode && !root.isAnimeMode
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             text: {
