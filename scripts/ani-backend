@@ -7,6 +7,9 @@
 #   ani-backend episodes <id>                   -> one episode number per line
 #   ani-backend play <id> <ep> <sub|dub> <title> -> launches the player, prints OK
 #   ani-backend history                         -> ep<TAB>id<TAB>title, most recent first
+#   ani-backend resume                          -> id<TAB>ep<TAB>seconds for saved spots ("c" in mpv)
+#   ani-backend delete <id>                     -> removes one anime from history, prints OK
+#   ani-backend clear                           -> wipes the whole history, prints OK
 #   ani-backend version                         -> ok|outdated|unknown, tab separated versions
 #
 # Errors go to stderr as "ERR<TAB>message" with exit code 1.
@@ -20,6 +23,10 @@ quality="${ANI_CLI_QUALITY:-best}"
 player_extra_flags="${ANI_CLI_PLAYER_FLAGS:-}"
 hist_dir="${ANI_CLI_HIST_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/ani-cli}"
 histfile="$hist_dir/ani-hsts"
+resume_dir="$hist_dir/resume"
+self_dir="$(cd "$(dirname "$0")" && pwd)"
+ANI_BACKEND_SELF="$self_dir/ani-backend"
+export ANI_BACKEND_SELF
 cipher_flag=""
 
 die() {
@@ -197,16 +204,38 @@ cmd_play() {
     player="${ANI_CLI_PLAYER:-mpv}"
     command -v "$player" >/dev/null 2>&1 || die "Player '$player' not found"
 
+    # Resume: pick up a saved spot for this episode (written when you press "c"
+    # in mpv), then clear it. Playing anything else drops it.
+    mkdir -p "$resume_dir"
+    resume_start=""
+    if [ -f "$resume_dir/$anime_id" ]; then
+        IFS="$(printf '\t')" read -r _rep _rpos <"$resume_dir/$anime_id"
+        [ "$_rep" = "$ep_no" ] && [ -n "$_rpos" ] && resume_start="$_rpos"
+        rm -f "$resume_dir/$anime_id"
+    fi
+
     set -- --referrer="$refr"
     [ -n "$audio_link" ] && set -- "$@" --audio-file="$audio_link"
     [ -n "$sub_link" ] && set -- "$@" --sub-file="$sub_link"
+    case "$(basename "$player")" in
+        mpv*)
+            [ -f "$self_dir/ani_resume.lua" ] && set -- "$@" --script="$self_dir/ani_resume.lua" \
+                --script-opts="ani_resume-dir=$resume_dir,ani_resume-id=$anime_id,ani_resume-ep=$ep_no"
+            [ -n "$resume_start" ] && set -- "$@" --start="$resume_start"
+            ;;
+    esac
     # shellcheck disable=SC2086
     set -- "$@" $player_extra_flags --force-media-title="${anime_title} Episode ${ep_no}" "$video_link"
 
+    # Run the player detached, then ask the shell to reopen the anime hub once
+    # it exits. Set ANI_BACKEND_NO_REOPEN=1 to turn the reopen off.
+    # shellcheck disable=SC2016
+            _wrap='"$@" >/dev/null 2>&1 </dev/null
+[ -n "$ANI_BACKEND_NO_REOPEN" ] || sh "$ANI_BACKEND_SELF" reopen >/dev/null 2>&1'
     if command -v setsid >/dev/null 2>&1; then
-        setsid -f nohup "$player" "$@" >/dev/null 2>&1
+        setsid -f nohup sh -c "$_wrap" sh "$player" "$@" >/dev/null 2>&1
     else
-        nohup "$player" "$@" >/dev/null 2>&1 &
+        nohup sh -c "$_wrap" sh "$player" "$@" >/dev/null 2>&1 &
     fi
 
     update_history
@@ -219,15 +248,54 @@ cmd_history() {
     awk -F '\t' 'NF >= 3 && $2 ~ /-/' "$histfile" | tac
 }
 
+# saved spots: id<TAB>ep<TAB>seconds per line
+cmd_resume() {
+    for _f in "$resume_dir"/*; do
+        [ -f "$_f" ] || continue
+        printf '%s\t%s\n' "$(basename "$_f")" "$(cat "$_f")"
+    done
+    exit 0
+}
+
+# remove one anime from the history (exact id match, field 2)
+cmd_delete() {
+    [ -z "$1" ] && die "missing anime id"
+    case "$1" in */*) die "bad anime id" ;; esac
+    rm -f "$resume_dir/$1"
+    _tmp="${histfile}.del.$$"
+    awk -F '\t' -v id="$1" '$2 != id' "$histfile" >"$_tmp" && mv "$_tmp" "$histfile"
+    printf 'OK\n'
+}
+
+cmd_clear() {
+    : >"$histfile"
+    rm -f "$resume_dir"/* 2>/dev/null
+    printf 'OK\n'
+}
+
+# reopen the anime hub in whichever mode is active (sidebar or main island)
+cmd_reopen() {
+    _shell_dir="${ANI_BACKEND_SHELL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+    _cfg="$HOME/.cache/quickshell/appearance-settings.json"
+    if grep -Eq '"sidebarEnabled"[[:space:]]*:[[:space:]]*true' "$_cfg" 2>/dev/null; then
+        _target="tide-sidebar"
+    else
+        _target="tide"
+    fi
+    qs ipc -p "$_shell_dir" call "$_target" openAnime
+}
+
 cmd_version() {
     _bin="${ANI_CLI_PATH:-$(command -v ani-cli 2>/dev/null)}"
     _local=""
     [ -n "$_bin" ] && [ -r "$_bin" ] && _local="$(sed -nE 's|^version_number="([^"]+)"$|\1|p' "$_bin" 2>/dev/null | head -n 1)"
-    _cache="${XDG_CACHE_HOME:-$HOME/.cache}/ani-backend-remote-version"
+    _cache="${XDG_CACHE_HOME:-$HOME/.cache}/ani-backend-aur-version"
     _remote=""
     [ -n "$(find "$_cache" -mmin -360 2>/dev/null)" ] && _remote="$(cat "$_cache")"
     if [ -z "$_remote" ]; then
-        _remote="$(curl -fsSL --max-time 8 "https://raw.githubusercontent.com/pystardust/ani-cli/master/ani-cli" 2>/dev/null | sed -nE 's|^version_number="([^"]+)"$|\1|p' | head -n 1)"
+        # newest version of the AUR package (override with ANI_BACKEND_AUR_PKG, e.g. ani-cli-git)
+        _remote="$(curl -fsSL --max-time 8 "https://aur.archlinux.org/rpc/v5/info/${ANI_BACKEND_AUR_PKG:-ani-cli}" 2>/dev/null |
+            sed -nE 's|.*"Version":"([^"]+)".*|\1|p' | sed -E 's|^[0-9]+:||; s|-[0-9]+$||' | head -n 1)"
         [ -n "$_remote" ] && { mkdir -p "$(dirname "$_cache")"; printf '%s\n' "$_remote" >"$_cache"; }
     fi
     if [ -z "$_local" ] || [ -z "$_remote" ]; then
@@ -246,6 +314,10 @@ case "$1" in
     episodes) cmd_episodes "$2" ;;
     play) cmd_play "$2" "$3" "$4" "$5" ;;
     history) cmd_history ;;
+    delete) cmd_delete "$2" ;;
+    resume) cmd_resume ;;
+    clear) cmd_clear ;;
+    reopen) cmd_reopen ;;
     version) cmd_version ;;
-    *) die "usage: ani-backend search|episodes|play|history|version" ;;
+    *) die "usage: ani-backend search|episodes|play|history|resume|delete|clear|version|reopen" ;;
 esac

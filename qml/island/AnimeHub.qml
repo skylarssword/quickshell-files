@@ -66,6 +66,15 @@ Item {
     property string versionLocal: ""
     property string versionRemote: ""
 
+    // When true, select the most recent history entry as soon as history has
+    // loaded (used when the hub reopens after mpv closes).
+    property bool autoContinue: false
+
+    // saved spots (press "c" in mpv): { animeId: { ep, pos } }
+    property var  resume: ({})
+    property bool _histLoaded: false
+    property bool _resumeLoaded: false
+
     property bool _searchDirty: false
     property bool _epDirty: false
 
@@ -79,13 +88,13 @@ Item {
         const seen = {}
         for (let i = 0; i < results.length; i++) {
             seen[results[i].id] = true
-            out.push({ id: results[i].id, title: results[i].title, section: "Results", ep: lastEp[results[i].id] || "" })
+            out.push({ id: results[i].id, title: results[i].title, section: "Results", ep: lastEp[results[i].id] || "", resume: resume[results[i].id] || null })
         }
         for (let j = 0; j < history.length; j++) {
             const h = history[j]
             if (seen[h.id]) continue
             if (q !== "" && h.title.toLowerCase().indexOf(q) < 0) continue
-            out.push({ id: h.id, title: h.title, section: "History", ep: h.ep })
+            out.push({ id: h.id, title: h.title, section: "History", ep: h.ep, resume: resume[h.id] || null })
         }
         return out
     }
@@ -107,6 +116,18 @@ Item {
             ? "Doesn't work right now. Update ani-cli!"
             : "Doesn't work right now. The site may have changed, check for an ani-cli update."
         return hint + (detail ? "\n" + detail : "")
+    }
+
+    function fmtTime(s) {
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+        const pad = n => (n < 10 ? "0" : "") + n
+        return h > 0 ? h + ":" + pad(m) + ":" + pad(sec) : m + ":" + pad(sec)
+    }
+
+    // true when the highlighted episode is the one you paused with "c"
+    readonly property bool resumeHere: {
+        const r = resume[selectedId]
+        return !!r && episodes.length > 0 && episodes[epIndex] === r.ep
     }
 
     function lastWatchedEp(id) {
@@ -223,8 +244,15 @@ Item {
                 const eps = lines(out).map(l => l.trim())
                 episodes = eps
                 const idx = eps.indexOf(lastWatchedEp(id))
-                watchedIdx = idx
-                epIndex = idx >= 0 ? Math.min(idx + 1, eps.length - 1) : 0
+                const r = resume[id]
+                const ri = r ? eps.indexOf(r.ep) : -1
+                if (ri >= 0) {              // paused mid-episode: land on it, not the next one
+                    watchedIdx = ri - 1
+                    epIndex = ri
+                } else {
+                    watchedIdx = idx
+                    epIndex = idx >= 0 ? Math.min(idx + 1, eps.length - 1) : 0
+                }
                 Qt.callLater(() => epGrid.positionViewAtIndex(root.epIndex, GridView.Contain))
             }
         }
@@ -255,6 +283,26 @@ Item {
         }
     }
 
+    // Delete one anime from history. Updates the UI right away and tells the
+    // backend to drop it from the history file.
+    function deleteHistory(id) {
+        Quickshell.execDetached(["bash", backend, "delete", id])
+        history = history.filter(h => h.id !== id)
+        const r = Object.assign({}, resume)
+        delete r[id]
+        resume = r
+        if (selectedId === id) watchedIdx = -1
+        resultIndex = Math.max(0, Math.min(resultIndex, rows.length - 1))
+    }
+
+    function clearHistory() {
+        Quickshell.execDetached(["bash", backend, "clear"])
+        history = []
+        resume = ({})
+        watchedIdx = -1
+        resultIndex = Math.max(0, Math.min(resultIndex, rows.length - 1))
+    }
+
     function loadHistory(raw) {
         const parsed = []
         const ls = lines(raw)
@@ -263,10 +311,33 @@ Item {
             if (p.length >= 3) parsed.push({ ep: p[0], id: p[1], title: p.slice(2).join("\t") })
         }
         history = parsed
+        _histLoaded = true
+        maybeAutoContinue()
+    }
+
+    function loadResume(raw) {
+        const m = {}
+        const ls = lines(raw)
+        for (let i = 0; i < ls.length; i++) {
+            const p = ls[i].split("\t")
+            if (p.length >= 3) m[p[0]] = { ep: p[1], pos: parseInt(p[2]) }
+        }
+        resume = m
+        _resumeLoaded = true
+        maybeAutoContinue()
+    }
+
+    // once history and saved spots are both in, select the latest show
+    function maybeAutoContinue() {
+        if (!autoContinue || !_histLoaded || !_resumeLoaded) return
+        if (selectedId !== "" || history.length === 0) return
+        autoContinue = false
+        continueWatching()
     }
 
     Component.onCompleted: {
         historyProc.running = true
+        resumeProc.running = true
         versionProc.running = true
         focusInput()
     }
@@ -340,6 +411,19 @@ Item {
             const o = out
             out = ""
             root.loadHistory(o)
+        }
+    }
+
+    Process {
+        id: resumeProc
+        property string out: ""
+        command: ["bash", root.backend, "resume"]
+        stdout: SplitParser { onRead: resumeProc.out += data + "\n" }
+        onRunningChanged: {
+            if (running) return
+            const o = out
+            out = ""
+            root.loadResume(o)
         }
     }
 
@@ -554,6 +638,28 @@ Item {
                         width: ListView.view.width
                         height: (showSection ? 24 : 0) + 42
 
+                        // swipe-left-to-delete (same mechanism as the notification center)
+                        readonly property bool canDelete: modelData.ep !== ""
+                        property real dragX: 0
+                        property bool dragging: false
+                        property bool pendingDismiss: false
+                        readonly property real maxSwipe: -88
+                        readonly property real dismissThreshold: -56
+
+                        Behavior on dragX {
+                            enabled: !rowItem.dragging
+                            NumberAnimation {
+                                duration: 260
+                                easing.type: Easing.OutQuart
+                                onRunningChanged: {
+                                    if (!running && rowItem.pendingDismiss) {
+                                        rowItem.pendingDismiss = false
+                                        root.deleteHistory(rowItem.modelData.id)
+                                    }
+                                }
+                            }
+                        }
+
                         Text {
                             renderType: Text.NativeRendering
                             visible: rowItem.showSection
@@ -568,6 +674,30 @@ Item {
                         }
 
                         Rectangle {
+                            anchors.right: parent.right
+                            y: rowItem.showSection ? 24 : 0
+                            width: Math.max(0, -rowItem.dragX)
+                            height: 40
+                            radius: 9
+                            clip: true
+                            color: Qt.rgba(0.86, 0.26, 0.26, 1)
+                            visible: rowItem.dragX < -4
+
+                            Text {
+                                renderType: Text.NativeRendering
+                                anchors.right: parent.right
+                                anchors.rightMargin: 16
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "\uf1f8"
+                                font.family: root.iconFontFamily
+                                font.pixelSize: 14
+                                color: "white"
+                                opacity: Math.min(1, -rowItem.dragX / -rowItem.dismissThreshold)
+                            }
+                        }
+
+                        Rectangle {
+                            x: rowItem.dragX
                             y: rowItem.showSection ? 24 : 0
                             width: parent.width
                             height: 40
@@ -600,7 +730,9 @@ Item {
                                     renderType: Text.NativeRendering
                                     visible: rowItem.modelData.ep !== ""
                                     width: parent.width
-                                    text: "Last watched: ep " + rowItem.modelData.ep
+                                    text: rowItem.modelData.resume
+                                          ? "Paused: ep " + rowItem.modelData.resume.ep + " at " + root.fmtTime(rowItem.modelData.resume.pos)
+                                          : "Last watched: ep " + rowItem.modelData.ep
                                     elide: Text.ElideRight
                                     font.family: root.textFontFamily
                                     font.pixelSize: 10
@@ -609,12 +741,54 @@ Item {
                                 }
                             }
 
-                            MouseArea {
-                                id: rowMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: { root.openRow(rowItem.index); root.focusInput() }
+                        }
+
+                        // Sits outside the moving card so the cursor position
+                        // doesn't shift while dragging (1:1 swipe).
+                        MouseArea {
+                            id: rowMouse
+                            x: 0
+                            y: rowItem.showSection ? 24 : 0
+                            width: rowItem.width
+                            height: 40
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            property real pressX: 0
+                            property bool moved: false
+
+                            onPressed: function(mouse) {
+                                pressX = mouse.x
+                                moved = false
+                                rowItem.dragging = true
+                            }
+
+                            onPositionChanged: function(mouse) {
+                                if (!pressed || !rowItem.canDelete) return
+                                const delta = Math.min(0, mouse.x - pressX)
+                                if (!moved && Math.abs(delta) > 6) moved = true
+                                if (moved) rowItem.dragX = Math.max(rowItem.maxSwipe, delta)
+                            }
+
+                            onReleased: {
+                                rowItem.dragging = false
+                                if (moved) {
+                                    if (rowItem.dragX <= rowItem.dismissThreshold) {
+                                        rowItem.pendingDismiss = true
+                                        rowItem.dragX = -rowItem.width
+                                    } else {
+                                        rowItem.dragX = 0
+                                    }
+                                    root.focusInput()
+                                    return
+                                }
+                                root.openRow(rowItem.index)
+                                root.focusInput()
+                            }
+
+                            onCanceled: {
+                                rowItem.dragging = false
+                                rowItem.dragX = 0
                             }
                         }
                     }
@@ -816,6 +990,83 @@ Item {
                         }
                     }
                 }
+
+                // hold to clear all history; the bar fills while you hold
+                Rectangle {
+                    id: clearBtn
+                    visible: root.history.length > 0
+                    property real hold: 0
+                    width: 72; height: 26; radius: 13
+                    color: clearMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent"
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.15)
+                    Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: parent.width * clearBtn.hold
+                        radius: parent.radius
+                        visible: clearBtn.hold > 0
+                        color: Qt.rgba(0.86, 0.26, 0.26, 0.6)
+                    }
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 5
+                        Text {
+                            renderType: Text.NativeRendering
+                            text: "\uf1f8"
+                            font.family: root.iconFontFamily
+                            font.pixelSize: 11
+                            color: "white"
+                            opacity: 0.5 + 0.5 * clearBtn.hold
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            renderType: Text.NativeRendering
+                            text: clearMouse.pressed ? "Hold…" : "Clear"
+                            font.family: root.textFontFamily
+                            font.pixelSize: 12
+                            color: "white"
+                            opacity: 0.5 + 0.5 * clearBtn.hold
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    NumberAnimation {
+                        id: holdAnim
+                        target: clearBtn
+                        property: "hold"
+                        from: 0; to: 1
+                        duration: 1200
+                        onStopped: {
+                            if (clearBtn.hold >= 1) {
+                                root.clearHistory()
+                                clearBtn.hold = 0
+                            }
+                        }
+                    }
+
+                    NumberAnimation {
+                        id: releaseAnim
+                        target: clearBtn
+                        property: "hold"
+                        to: 0
+                        duration: 180
+                    }
+
+                    MouseArea {
+                        id: clearMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onPressed: { releaseAnim.stop(); holdAnim.restart(); root.focusInput() }
+                        onReleased: { if (holdAnim.running) { holdAnim.stop(); releaseAnim.restart() } }
+                        onCanceled: { if (holdAnim.running) { holdAnim.stop(); releaseAnim.restart() } }
+                    }
+                }
             }
 
             Text {
@@ -907,7 +1158,7 @@ Item {
                         }
                         Text {
                             renderType: Text.NativeRendering
-                            text: root.episodes.length > 0 ? "Play ep " + root.episodes[root.epIndex] : "Play"
+                            text: root.episodes.length > 0 ? (root.resumeHere ? "Resume ep " : "Play ep ") + root.episodes[root.epIndex] : "Play"
                             font.family: root.textFontFamily
                             font.pixelSize: 12
                             color: "white"

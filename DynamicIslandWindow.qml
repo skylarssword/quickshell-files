@@ -96,6 +96,17 @@ onCapsuleOpacityChanged:       if (appearanceSettingsLoaded && !_pollReading) ap
         id: hyprDispatch
     }
 
+Timer {
+        id: openAnimeTimer
+        interval: 80   // SearchPillLayer clears its text when it becomes visible
+        repeat: false
+        onTriggered: {
+            if (!searchLoader.item) return
+            searchLoader.item.animeAutoContinue = true
+            searchLoader.item.setQuery("anime")
+        }
+    }
+
 IpcHandler {
         target: "tide"
 
@@ -104,6 +115,14 @@ IpcHandler {
                 islandContainer.smartRestoreState()
             else
                 islandContainer.showSearch()
+        }
+
+        // Called by scripts/ani-backend when mpv exits: reopen the search pill
+        // straight into anime mode.
+        function openAnime(): void {
+            if (islandContainer.islandState !== "search")
+                islandContainer.showSearch()
+            openAnimeTimer.restart()
         }
 
         function toggleControlCenter(): void {

@@ -123,6 +123,8 @@ Item {
         }
     }
     property string searchText: ""
+    // set by the shell right before it types "anime" after mpv exits
+    property bool animeAutoContinue: false
 
     readonly property bool isWallpaperMode: {
         let q = searchText.trim().toLowerCase()
@@ -160,6 +162,7 @@ Item {
             isCommandMode = false
             animeFocusTimer.restart()
         } else {
+            animeAutoContinue = false
             searchInput.text = ""
             root.searchText = ""
             searchInput.forceActiveFocus()
@@ -238,6 +241,10 @@ Item {
 
     function focusInput() {
         searchInput.forceActiveFocus()
+    }
+
+    function setQuery(text) {
+        searchInput.text = text
     }
 
     function inputHasFocus() {
@@ -428,6 +435,7 @@ Item {
 
             sourceComponent: Component {
                 AnimeHub {
+                    autoContinue: root.animeAutoContinue
                     iconFontFamily: root.iconFontFamily
                     textFontFamily: root.textFontFamily
                     onCloseRequested: root.closeRequested()

@@ -33,6 +33,23 @@ PanelWindow {
     function close() { launcherOpen = false }
     function toggle(){ launcherOpen = !launcherOpen }
 
+    // Open straight into anime mode, selecting the show you just watched.
+    // Used by scripts/ani-backend after mpv exits.
+    function openAnime() {
+        launcherOpen = true
+        openAnimeTimer.restart()
+    }
+
+    Timer {
+        id: openAnimeTimer
+        interval: 80   // SearchPillLayer clears its text when it becomes visible
+        repeat: false
+        onTriggered: {
+            searchContent.animeAutoContinue = true
+            searchContent.setQuery("anime")
+        }
+    }
+
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     aboveWindows: true
