@@ -70,6 +70,11 @@ Item {
     // loaded (used when the hub reopens after mpv closes).
     property bool autoContinue: false
 
+    // saved spots (press "c" in mpv): { animeId: { ep, pos } }
+    property var  resume: ({})
+    property bool _histLoaded: false
+    property bool _resumeLoaded: false
+
     property bool _searchDirty: false
     property bool _epDirty: false
 
@@ -83,13 +88,13 @@ Item {
         const seen = {}
         for (let i = 0; i < results.length; i++) {
             seen[results[i].id] = true
-            out.push({ id: results[i].id, title: results[i].title, section: "Results", ep: lastEp[results[i].id] || "" })
+            out.push({ id: results[i].id, title: results[i].title, section: "Results", ep: lastEp[results[i].id] || "", resume: resume[results[i].id] || null })
         }
         for (let j = 0; j < history.length; j++) {
             const h = history[j]
             if (seen[h.id]) continue
             if (q !== "" && h.title.toLowerCase().indexOf(q) < 0) continue
-            out.push({ id: h.id, title: h.title, section: "History", ep: h.ep })
+            out.push({ id: h.id, title: h.title, section: "History", ep: h.ep, resume: resume[h.id] || null })
         }
         return out
     }
@@ -111,6 +116,18 @@ Item {
             ? "Doesn't work right now. Update ani-cli!"
             : "Doesn't work right now. The site may have changed, check for an ani-cli update."
         return hint + (detail ? "\n" + detail : "")
+    }
+
+    function fmtTime(s) {
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+        const pad = n => (n < 10 ? "0" : "") + n
+        return h > 0 ? h + ":" + pad(m) + ":" + pad(sec) : m + ":" + pad(sec)
+    }
+
+    // true when the highlighted episode is the one you paused with "c"
+    readonly property bool resumeHere: {
+        const r = resume[selectedId]
+        return !!r && episodes.length > 0 && episodes[epIndex] === r.ep
     }
 
     function lastWatchedEp(id) {
@@ -227,8 +244,15 @@ Item {
                 const eps = lines(out).map(l => l.trim())
                 episodes = eps
                 const idx = eps.indexOf(lastWatchedEp(id))
-                watchedIdx = idx
-                epIndex = idx >= 0 ? Math.min(idx + 1, eps.length - 1) : 0
+                const r = resume[id]
+                const ri = r ? eps.indexOf(r.ep) : -1
+                if (ri >= 0) {              // paused mid-episode: land on it, not the next one
+                    watchedIdx = ri - 1
+                    epIndex = ri
+                } else {
+                    watchedIdx = idx
+                    epIndex = idx >= 0 ? Math.min(idx + 1, eps.length - 1) : 0
+                }
                 Qt.callLater(() => epGrid.positionViewAtIndex(root.epIndex, GridView.Contain))
             }
         }
@@ -264,6 +288,9 @@ Item {
     function deleteHistory(id) {
         Quickshell.execDetached(["bash", backend, "delete", id])
         history = history.filter(h => h.id !== id)
+        const r = Object.assign({}, resume)
+        delete r[id]
+        resume = r
         if (selectedId === id) watchedIdx = -1
         resultIndex = Math.max(0, Math.min(resultIndex, rows.length - 1))
     }
@@ -271,6 +298,7 @@ Item {
     function clearHistory() {
         Quickshell.execDetached(["bash", backend, "clear"])
         history = []
+        resume = ({})
         watchedIdx = -1
         resultIndex = Math.max(0, Math.min(resultIndex, rows.length - 1))
     }
@@ -283,14 +311,33 @@ Item {
             if (p.length >= 3) parsed.push({ ep: p[0], id: p[1], title: p.slice(2).join("\t") })
         }
         history = parsed
-        if (autoContinue && selectedId === "" && history.length > 0) {
-            autoContinue = false
-            continueWatching()
+        _histLoaded = true
+        maybeAutoContinue()
+    }
+
+    function loadResume(raw) {
+        const m = {}
+        const ls = lines(raw)
+        for (let i = 0; i < ls.length; i++) {
+            const p = ls[i].split("\t")
+            if (p.length >= 3) m[p[0]] = { ep: p[1], pos: parseInt(p[2]) }
         }
+        resume = m
+        _resumeLoaded = true
+        maybeAutoContinue()
+    }
+
+    // once history and saved spots are both in, select the latest show
+    function maybeAutoContinue() {
+        if (!autoContinue || !_histLoaded || !_resumeLoaded) return
+        if (selectedId !== "" || history.length === 0) return
+        autoContinue = false
+        continueWatching()
     }
 
     Component.onCompleted: {
         historyProc.running = true
+        resumeProc.running = true
         versionProc.running = true
         focusInput()
     }
@@ -364,6 +411,19 @@ Item {
             const o = out
             out = ""
             root.loadHistory(o)
+        }
+    }
+
+    Process {
+        id: resumeProc
+        property string out: ""
+        command: ["bash", root.backend, "resume"]
+        stdout: SplitParser { onRead: resumeProc.out += data + "\n" }
+        onRunningChanged: {
+            if (running) return
+            const o = out
+            out = ""
+            root.loadResume(o)
         }
     }
 
@@ -670,7 +730,9 @@ Item {
                                     renderType: Text.NativeRendering
                                     visible: rowItem.modelData.ep !== ""
                                     width: parent.width
-                                    text: "Last watched: ep " + rowItem.modelData.ep
+                                    text: rowItem.modelData.resume
+                                          ? "Paused: ep " + rowItem.modelData.resume.ep + " at " + root.fmtTime(rowItem.modelData.resume.pos)
+                                          : "Last watched: ep " + rowItem.modelData.ep
                                     elide: Text.ElideRight
                                     font.family: root.textFontFamily
                                     font.pixelSize: 10
@@ -1096,7 +1158,7 @@ Item {
                         }
                         Text {
                             renderType: Text.NativeRendering
-                            text: root.episodes.length > 0 ? "Play ep " + root.episodes[root.epIndex] : "Play"
+                            text: root.episodes.length > 0 ? (root.resumeHere ? "Resume ep " : "Play ep ") + root.episodes[root.epIndex] : "Play"
                             font.family: root.textFontFamily
                             font.pixelSize: 12
                             color: "white"

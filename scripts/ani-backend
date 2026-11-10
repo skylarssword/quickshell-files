@@ -10,6 +10,8 @@
 #   ani-backend resume                          -> id<TAB>ep<TAB>seconds for saved spots ("c" in mpv)
 #   ani-backend delete <id>                     -> removes one anime from history, prints OK
 #   ani-backend clear                           -> wipes the whole history, prints OK
+#   ani-backend autoplay [on|off]               -> prints or sets the Auto toggle
+#   ani-backend finished                        -> id<TAB>ep<TAB>mode if the last episode ended at 90%+ (consumed)
 #   ani-backend version                         -> ok|outdated|unknown, tab separated versions
 #
 # Errors go to stderr as "ERR<TAB>message" with exit code 1.
@@ -214,13 +216,16 @@ cmd_play() {
         rm -f "$resume_dir/$anime_id"
     fi
 
+    # a new episode starts: any old "finished" marker is stale
+    rm -f "$hist_dir/finished"
+
     set -- --referrer="$refr"
     [ -n "$audio_link" ] && set -- "$@" --audio-file="$audio_link"
     [ -n "$sub_link" ] && set -- "$@" --sub-file="$sub_link"
     case "$(basename "$player")" in
         mpv*)
             [ -f "$self_dir/ani_resume.lua" ] && set -- "$@" --script="$self_dir/ani_resume.lua" \
-                --script-opts="ani_resume-dir=$resume_dir,ani_resume-id=$anime_id,ani_resume-ep=$ep_no"
+                --script-opts="ani_resume-dir=$resume_dir,ani_resume-id=$anime_id,ani_resume-ep=$ep_no,ani_resume-finished=$hist_dir/finished,ani_resume-mode=$mode"
             [ -n "$resume_start" ] && set -- "$@" --start="$resume_start"
             ;;
     esac
@@ -273,6 +278,31 @@ cmd_clear() {
     printf 'OK\n'
 }
 
+# Auto toggle: a flag file next to the history
+cmd_autoplay() {
+    _af="$hist_dir/autoplay"
+    case "$1" in
+        on)  : >"$_af"; printf 'on\n' ;;
+        off) rm -f "$_af"; printf 'off\n' ;;
+        *)   if [ -f "$_af" ]; then printf 'on\n'; else printf 'off\n'; fi ;;
+    esac
+    exit 0
+}
+
+# Written by ani_resume.lua when mpv exits at 90%+. Reading consumes it, and
+# anything older than 5 minutes is ignored.
+cmd_finished() {
+    _ff="$hist_dir/finished"
+    [ -f "$_ff" ] || exit 0
+    IFS="$(printf '\t')" read -r _fid _fep _fts _fmode <"$_ff"
+    rm -f "$_ff"
+    case "$_fts" in ''|*[!0-9]*) exit 0 ;; esac
+    [ -n "$_fid" ] && [ -n "$_fep" ] || exit 0
+    [ $(( $(date +%s) - _fts )) -le 300 ] || exit 0
+    printf '%s\t%s\t%s\n' "$_fid" "$_fep" "$_fmode"
+    exit 0
+}
+
 # reopen the anime hub in whichever mode is active (sidebar or main island)
 cmd_reopen() {
     _shell_dir="${ANI_BACKEND_SHELL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -318,6 +348,8 @@ case "$1" in
     resume) cmd_resume ;;
     clear) cmd_clear ;;
     reopen) cmd_reopen ;;
+    autoplay) cmd_autoplay "$2" ;;
+    finished) cmd_finished ;;
     version) cmd_version ;;
-    *) die "usage: ani-backend search|episodes|play|history|resume|delete|clear|version|reopen" ;;
+    *) die "usage: ani-backend search|episodes|play|history|resume|delete|clear|autoplay|finished|version|reopen" ;;
 esac

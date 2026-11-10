@@ -75,6 +75,19 @@ Item {
     property bool _histLoaded: false
     property bool _resumeLoaded: false
 
+    // Auto: quit an episode at 90%+ and the next one starts after a short countdown.
+    property bool   autoplay: false
+    property int    countdown: 0             // seconds left, 0 = not counting down
+    property string noticeText: ""
+    property var    finishedMark: null       // { id, ep, mode } left by mpv at 90%+
+    property var    pendingAutoplay: null
+    property bool   _finishedLoaded: false
+    property bool   _autoplayLoaded: false
+
+    readonly property string footerText: playing ? "Getting stream…"
+        : (countdown > 0 ? "Next episode in " + countdown + "…  any key to cancel"
+        : (errorText !== "" ? errorText.replace(/\n/g, " · ") : noticeText))
+
     property bool _searchDirty: false
     property bool _epDirty: false
 
@@ -153,6 +166,32 @@ Item {
     }
 
     function toggleMode() { mode = mode === "sub" ? "dub" : "sub" }
+
+    function toggleAutoplay() {
+        autoplay = !autoplay
+        Quickshell.execDetached(["bash", backend, "autoplay", autoplay ? "on" : "off"])
+        if (!autoplay) cancelCountdown()
+    }
+
+    function notify(msg) {
+        noticeText = msg
+        noticeTimer.restart()
+    }
+
+    function startCountdown() {
+        if (!autoplay) return
+        countdown = 5
+        countdownTimer.restart()
+    }
+
+    // returns true when it actually cancelled, so key handlers can swallow the key
+    function cancelCountdown() {
+        if (countdown <= 0) return false
+        countdown = 0
+        countdownTimer.stop()
+        notify("Autoplay cancelled")
+        return true
+    }
 
     function selectAnime(id, title) {
         selectedId = id
@@ -239,6 +278,7 @@ Item {
         if (id === selectedId) {
             if (err.trim() !== "") {
                 episodes = []
+                pendingAutoplay = null
                 errorText = failureText(firstError(err))
             } else {
                 const eps = lines(out).map(l => l.trim())
@@ -253,6 +293,16 @@ Item {
                     watchedIdx = idx
                     epIndex = idx >= 0 ? Math.min(idx + 1, eps.length - 1) : 0
                 }
+                // Auto: the episode you just finished is done, line up the next one
+                if (pendingAutoplay && pendingAutoplay.id === id) {
+                    const ni = eps.indexOf(pendingAutoplay.ep) + 1
+                    if (ni > 0 && ni < eps.length) {
+                        watchedIdx = ni - 1
+                        epIndex = ni
+                        startCountdown()
+                    }
+                }
+                pendingAutoplay = null
                 Qt.callLater(() => epGrid.positionViewAtIndex(root.epIndex, GridView.Contain))
             }
         }
@@ -327,17 +377,38 @@ Item {
         maybeAutoContinue()
     }
 
-    // once history and saved spots are both in, select the latest show
+    function loadFinished(raw) {
+        const first = lines(raw)[0]
+        const f = first ? first.split("\t") : []
+        finishedMark = f.length >= 2 ? { id: f[0], ep: f[1], mode: f.length > 2 ? f[2] : "" } : null
+        _finishedLoaded = true
+        maybeAutoContinue()
+    }
+
+    // once history, saved spots, the Auto flag and the finished marker are in, select the latest show
     function maybeAutoContinue() {
-        if (!autoContinue || !_histLoaded || !_resumeLoaded) return
+        if (!autoContinue || !_histLoaded || !_resumeLoaded || !_finishedLoaded || !_autoplayLoaded) return
         if (selectedId !== "" || history.length === 0) return
         autoContinue = false
+
+        // finished at 90%+ with Auto on: open that show and count down to the next episode
+        if (autoplay && finishedMark) {
+            const h = history.find(x => x.id === finishedMark.id)
+            if (h) {
+                if (finishedMark.mode === "sub" || finishedMark.mode === "dub") mode = finishedMark.mode
+                pendingAutoplay = finishedMark
+                selectAnime(h.id, h.title)
+                return
+            }
+        }
         continueWatching()
     }
 
     Component.onCompleted: {
         historyProc.running = true
         resumeProc.running = true
+        autoplayProc.running = true
+        finishedProc.running = true
         versionProc.running = true
         focusInput()
     }
@@ -355,6 +426,27 @@ Item {
         interval: 9000
         repeat: false
         onTriggered: root.errorText = ""
+    }
+
+    Timer {
+        id: noticeTimer
+        interval: 2500
+        repeat: false
+        onTriggered: root.noticeText = ""
+    }
+
+    Timer {
+        id: countdownTimer
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            root.countdown -= 1
+            if (root.countdown <= 0) {
+                stop()
+                root.countdown = 0
+                root.playSelected()
+            }
+        }
     }
 
     Process {
@@ -424,6 +516,34 @@ Item {
             const o = out
             out = ""
             root.loadResume(o)
+        }
+    }
+
+    Process {
+        id: autoplayProc
+        property string out: ""
+        command: ["bash", root.backend, "autoplay"]
+        stdout: SplitParser { onRead: autoplayProc.out += data + "\n" }
+        onRunningChanged: {
+            if (running) return
+            const o = out
+            out = ""
+            root.autoplay = root.lines(o).indexOf("on") >= 0
+            root._autoplayLoaded = true
+            root.maybeAutoContinue()
+        }
+    }
+
+    Process {
+        id: finishedProc
+        property string out: ""
+        command: ["bash", root.backend, "finished"]
+        stdout: SplitParser { onRead: finishedProc.out += data + "\n" }
+        onRunningChanged: {
+            if (running) return
+            const o = out
+            out = ""
+            root.loadFinished(o)
         }
     }
 
@@ -531,23 +651,32 @@ Item {
                         }
                     }
 
+                    // keys without their own handler below (letters, backspace, ...)
+                    Keys.onPressed: (event) => {
+                        if (root.cancelCountdown()) event.accepted = true
+                    }
+
                     Keys.onEscapePressed: {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "episodes") root.zone = "results"
                         else if (text.length > 0) text = ""
                         else root.closeRequested()
                     }
-                    Keys.onReturnPressed: root.activate()
-                    Keys.onEnterPressed: root.activate()
-                    Keys.onTabPressed: root.toggleMode()
+                    Keys.onReturnPressed: { if (!root.cancelCountdown()) root.activate() }
+                    Keys.onEnterPressed: { if (!root.cancelCountdown()) root.activate() }
+                    Keys.onTabPressed: { if (!root.cancelCountdown()) root.toggleMode() }
                     Keys.onUpPressed: {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "results") root.moveRow(-1)
                         else root.moveEp(-root.epCols)
                     }
                     Keys.onDownPressed: {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "results") root.moveRow(1)
                         else root.moveEp(root.epCols)
                     }
                     Keys.onLeftPressed: (event) => {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "episodes") {
                             if (root.epIndex % root.epCols === 0) root.zone = "results"
                             else root.moveEp(-1)
@@ -556,6 +685,7 @@ Item {
                         }
                     }
                     Keys.onRightPressed: (event) => {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "episodes") {
                             root.moveEp(1)
                         } else if (root.episodes.length > 0 && cursorPosition >= text.length) {
@@ -956,6 +1086,7 @@ Item {
 
             Row {
                 id: modePills
+                visible: root.countdown <= 0      // the footer is the countdown while it runs
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
@@ -988,6 +1119,50 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: { root.mode = modelData.key; root.focusInput() }
                         }
+                    }
+                }
+
+                // Auto: play the next episode when one ends at 90%+. Green = on.
+                Rectangle {
+                    id: autoBtn
+                    width: 64; height: 26; radius: 13
+                    color: root.autoplay
+                           ? Qt.rgba(0.35, 0.85, 0.5, autoMouse.containsMouse ? 0.24 : 0.16)
+                           : (autoMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
+                    border.width: 1
+                    border.color: root.autoplay ? Qt.rgba(0.35, 0.85, 0.5, 0.55) : Qt.rgba(1, 1, 1, 0.15)
+                    Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+                    Behavior on border.color { ColorAnimation { duration: IslandMotion.micro } }
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 5
+                        Text {
+                            renderType: Text.NativeRendering
+                            text: "\uf04b"
+                            font.family: root.iconFontFamily
+                            font.pixelSize: 10
+                            color: root.autoplay ? Qt.rgba(0.45, 0.92, 0.6, 1.0) : "white"
+                            opacity: root.autoplay ? 1.0 : 0.5
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            renderType: Text.NativeRendering
+                            text: "Auto"
+                            font.family: root.textFontFamily
+                            font.pixelSize: 12
+                            color: root.autoplay ? Qt.rgba(0.45, 0.92, 0.6, 1.0) : "white"
+                            opacity: root.autoplay ? 1.0 : 0.5
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    MouseArea {
+                        id: autoMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: { root.toggleAutoplay(); root.focusInput() }
                     }
                 }
 
@@ -1071,8 +1246,8 @@ Item {
 
             Text {
                 renderType: Text.NativeRendering
-                anchors.left: modePills.right
-                anchors.leftMargin: 14
+                anchors.left: parent.left
+                anchors.leftMargin: root.countdown > 0 ? 14 : modePills.width + 28
                 anchors.right: actionRow.left
                 anchors.rightMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
@@ -1080,9 +1255,11 @@ Item {
                 maximumLineCount: 1
                 font.family: root.textFontFamily
                 font.pixelSize: 11
-                color: root.errorText !== "" ? Qt.rgba(1.0, 0.62, 0.55, 0.95) : "white"
-                opacity: root.errorText !== "" || root.playing ? 1.0 : 0
-                text: root.playing ? "Getting stream…" : root.errorText.replace(/\n/g, " · ")
+                color: root.countdown > 0 ? Qt.rgba(0.45, 0.92, 0.6, 1.0)
+                       : (root.playing ? "white"
+                          : (root.errorText !== "" ? Qt.rgba(1.0, 0.62, 0.55, 0.95) : Qt.rgba(1, 1, 1, 0.55)))
+                opacity: root.footerText !== "" ? 1.0 : 0
+                text: root.footerText
             }
 
             Row {
@@ -1093,7 +1270,7 @@ Item {
                 spacing: 10
 
                 Rectangle {
-                    visible: root.history.length > 0
+                    visible: root.history.length > 0 && root.countdown <= 0
                     width: contRow.width + 20
                     height: 28
                     radius: 8
@@ -1175,6 +1352,18 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    // any click while counting down cancels it (the click still goes through)
+    MouseArea {
+        anchors.fill: parent
+        z: 100
+        enabled: root.countdown > 0
+        propagateComposedEvents: true
+        onPressed: function(mouse) {
+            root.cancelCountdown()
+            mouse.accepted = false
         }
     }
 }

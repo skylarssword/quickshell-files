@@ -1866,11 +1866,52 @@ Timer { id: autoHideTimer; interval: islandContainer.defaultAutoHideInterval; on
             }
         }
 
+        // Liquid Glass (control center only): a dark hairline and soft shadow just outside
+        // the capsule. It sits beside the capsule, not inside it, because the capsule clips.
+        Item {
+            id: capsuleGlassEdge
+            z: 4
+            x: mainCapsule.x
+            y: mainCapsule.y
+            width: mainCapsule.width
+            height: mainCapsule.height
+            opacity: mainCapsule.glassBody ? mainCapsule.opacity : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+
+            Repeater {
+                model: 3
+                Rectangle {
+                    required property int index
+                    readonly property int k: index + 1
+                    x: -k
+                    y: -k
+                    width: capsuleGlassEdge.width + 2 * k
+                    height: capsuleGlassEdge.height + 2 * k
+                    radius: mainCapsule.radius + k
+                    color: "transparent"
+                    border.width: 1
+                    border.color: Qt.rgba(0, 0, 0, k === 1 ? mainCapsule.glassEdgeAlpha : mainCapsule.glassShadowAlpha / (k - 1))
+                }
+            }
+        }
+
        Rectangle {
 id: mainCapsule
                 z: 5
                 property int morphDuration: IslandMotion.standard
                 readonly property int infoActiveTab: infoLoader.item ? infoLoader.item.activeTab : 0
+            // ── Liquid Glass (control center only) ──────────────────────────────
+            readonly property bool glassBody: islandContainer.controlCenterLayerVisible
+                && !!controlCenterLoader.item && controlCenterLoader.item.liquidGlass
+            // multiplies the body's black alpha while glass is on: 0.25 turns the 20% chip into 5%
+            readonly property real glassBodyScale: 0.25
+            readonly property real bodyAlphaScale: glassBody ? glassBodyScale : 1.0
+            readonly property real glassEdgeAlpha:   0.16   // dark hairline outside the edge (keeps it visible on white)
+            readonly property real glassShadowAlpha: 0.08   // soft shadow falloff outside that
+            readonly property real glassRimAlpha:    0.18   // bright inner rim
+            readonly property real glassGlowAlpha:   0.06   // soft light at the top
+            readonly property real glassGlintAlpha:  0.55   // peak of the specular line along the top edge
             property real outlineWidth: IslandMotion.surfaceBorderWidth
             property color outlineColor: root.overviewContentVisible ? root.overviewCapsuleBorderColor : IslandMotion.surfaceBorderColor
             property real displayedWidth: baseTargetWidth
@@ -2021,8 +2062,8 @@ color: root.overviewContentVisible
     : (root.gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (root.capsuleUseWalColor
-            ? Qt.rgba(root.capsuleWalColor.r, root.capsuleWalColor.g, root.capsuleWalColor.b, root.capsuleOpacity)
-            : Qt.rgba(0, 0, 0, root.capsuleOpacity)))
+            ? Qt.rgba(root.capsuleWalColor.r, root.capsuleWalColor.g, root.capsuleWalColor.b, root.capsuleOpacity * mainCapsule.bodyAlphaScale)
+            : Qt.rgba(0, 0, 0, root.capsuleOpacity * mainCapsule.bodyAlphaScale)))
             y: 5
             anchors.horizontalCenter: parent.horizontalCenter
             clip: true
@@ -2055,6 +2096,49 @@ Behavior on radius { NumberAnimation { duration: mainCapsule.morphDuration; easi
             Behavior on outlineColor { ColorAnimation { duration: IslandMotion.micro; easing.type: IslandMotion.easeMove } }
             border.width: outlineWidth
             border.color: outlineColor
+
+            // Liquid Glass (control center only): bright rim, soft top light, specular glint
+            Item {
+                id: capsuleGlassInner
+                anchors.fill: parent
+                opacity: mainCapsule.glassBody ? 1 : 0
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: mainCapsule.radius
+                    color: "transparent"
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, mainCapsule.glassRimAlpha)
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    radius: Math.max(0, mainCapsule.radius - 1)
+                    gradient: Gradient {
+                        GradientStop { position: 0.00; color: Qt.rgba(1, 1, 1, mainCapsule.glassGlowAlpha) }
+                        GradientStop { position: 0.25; color: Qt.rgba(1, 1, 1, mainCapsule.glassGlowAlpha * 0.25) }
+                        GradientStop { position: 0.70; color: Qt.rgba(1, 1, 1, 0.0) }
+                        GradientStop { position: 1.00; color: Qt.rgba(1, 1, 1, 0.025) }
+                    }
+                }
+
+                Rectangle {
+                    x: mainCapsule.radius * 0.8
+                    y: 1
+                    width: Math.max(0, capsuleGlassInner.width - mainCapsule.radius * 1.6)
+                    height: 1
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.00; color: Qt.rgba(1, 1, 1, 0.0) }
+                        GradientStop { position: 0.20; color: Qt.rgba(1, 1, 1, mainCapsule.glassGlintAlpha) }
+                        GradientStop { position: 0.60; color: Qt.rgba(1, 1, 1, mainCapsule.glassGlintAlpha * 0.35) }
+                        GradientStop { position: 1.00; color: Qt.rgba(1, 1, 1, 0.0) }
+                    }
+                }
+            }
 
             Rectangle {
                 anchors.fill: parent

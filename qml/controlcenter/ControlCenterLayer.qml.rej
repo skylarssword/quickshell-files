@@ -1,0 +1,99 @@
+--- qml/controlcenter/ControlCenterLayer.qml
++++ qml/controlcenter/ControlCenterLayer.qml
+@@ -1393,6 +1485,7 @@ Text {
+                                   ? "#e5a84b"
+                                   : (sunsetBtnMouse.containsMouse ? Qt.rgba(1,1,1,0.4) : Qt.rgba(1,1,1,0.2))
+                     border.width: 1
++                    Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+                     Behavior on color { ColorAnimation { duration: 150 } }
+                     Behavior on border.color { ColorAnimation { duration: 150 } }
+@@ -1441,6 +1534,7 @@ Text {
+                                   ? Qt.rgba(1,1,1,0.4)
+                                   : (appearanceBtnMouse.containsMouse ? Qt.rgba(1,1,1,0.3) : Qt.rgba(1,1,1,0.2))
+                     border.width: 1
++                    Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+                     Behavior on color { ColorAnimation { duration: 150 } }
+                     Behavior on border.color { ColorAnimation { duration: 150 } }
+@@ -1488,6 +1582,7 @@ Rectangle {
+                     color: (wifiCardMouse.containsMouse || wifiPanelOpen) ? Qt.rgba(1,1,1,0.09) : Qt.rgba(1,1,1,0.05)
+                     border.width: 1
+                     border.color: (wifiCardMouse.containsMouse || wifiPanelOpen) ? Qt.rgba(1,1,1,0.30) : Qt.rgba(1,1,1,0.16)
++                    Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+                     Behavior on color {
+                         ColorAnimation {
+@@ -1626,6 +1721,7 @@ Rectangle {
+                     color: (bluetoothCardMouse.containsMouse || bluetoothPanelOpen) ? Qt.rgba(1,1,1,0.09) : Qt.rgba(1,1,1,0.05)
+                     border.width: 1
+                     border.color: (bluetoothCardMouse.containsMouse || bluetoothPanelOpen) ? Qt.rgba(1,1,1,0.30) : Qt.rgba(1,1,1,0.16)
++                    Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+                     Behavior on color {
+                         ColorAnimation {
+@@ -1787,6 +1883,7 @@ Rectangle {
+                 color: Qt.rgba(1,1,1,0.05)
+                 border.width: 1
+                 border.color: Qt.rgba(1,1,1,0.16)
++                Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+                 opacity: Math.min(1, controlCenter.batteryDrawerProgress * 1.35)
+                 clip: true
+ 
+@@ -2127,6 +2224,7 @@ Rectangle {
+                 color: Qt.rgba(1,1,1,0.05)
+                 border.width: 1
+                 border.color: Qt.rgba(1,1,1,0.16)
++                Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+                 opacity: Math.min(1, controlCenter.batteryDrawerProgress * 1.35)
+                 clip: true
+ 
+@@ -2321,6 +2419,7 @@ Rectangle {
+             trackColor: controlCenter.trackColor
+             textPrimary: controlCenter.textPrimary
+             textSecondary: controlCenter.textSecondary
++            Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+             onInteractionStarted: {
+                 if (controlCenter.sliderIntroPending) {
+@@ -2359,6 +2458,7 @@ ControlSliderCard {
+             trackColor: controlCenter.trackColor
+             textPrimary: controlCenter.textPrimary
+             textSecondary: controlCenter.textSecondary
++            Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+             onInteractionStarted: {
+                 if (controlCenter.sliderIntroPending) {
+@@ -2406,6 +2506,7 @@ Rectangle {
+                 color: Qt.rgba(1,1,1,0.05)
+                 border.width: 1
+                 border.color: Qt.rgba(1,1,1,0.16)
++                Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+                 Column {
+                     id: appearanceColumn
+@@ -2433,7 +2534,7 @@ Rectangle {
+ Row {
+                             anchors.right: parent.right
+                             anchors.verticalCenter: parent.verticalCenter
+-                            spacing: 14
++                            spacing: 10
+ 
+ Row {
+                                 spacing: 6
+@@ -2728,6 +2875,7 @@ Rectangle {
+                 color:  Qt.rgba(1,1,1,0.05)
+                 border.width: 1
+                 border.color: Qt.rgba(1,1,1,0.16)
++                Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+                 Column {
+                     id: dockColumn
+@@ -3037,6 +3185,7 @@ Rectangle {
+                 color: Qt.rgba(1,1,1,0.05)
+                 border.width: 1
+                 border.color: Qt.rgba(1,1,1,0.16)
++                Loader { anchors.fill: parent; property real cardRadius: parent.radius; sourceComponent: glassSheenComponent }
+ 
+                 Column {
+                     id: islandSettingsColumn
