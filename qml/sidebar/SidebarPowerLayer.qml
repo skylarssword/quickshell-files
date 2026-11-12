@@ -16,11 +16,14 @@ PanelWindow {
     property color  walColor:            "#000000"
     property real   capsuleOpacityValue: 0.20
 
+    // while Liquid Glass is on the body gets more see-through (same scale as the island)
+    readonly property real glassBodyScale: Glass.enabled ? Glass.bodyScale : 1.0
+
     readonly property color bgColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
-            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue))
+            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
+            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
 
     property bool popupOpen: false
     function open()  { popupOpen = true  }
@@ -64,6 +67,8 @@ PanelWindow {
             border.color: IslandMotion.surfaceBorderColor
             Behavior on color { ColorAnimation { duration: 200 } }
         }
+
+        GlassSheen { cornerRadius: 28 }
 
         Row {
             id: buttonRow

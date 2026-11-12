@@ -366,6 +366,7 @@ Item {
 
             Rectangle {
                 id: searchPill
+                GlassSheen {}
                 anchors.left: parent.left
                 anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
@@ -455,6 +456,7 @@ Item {
                 spacing: 4
 
                 Rectangle {
+                    GlassSheen {}
                     width: 26; height: 26; radius: 13
                     anchors.verticalCenter: parent.verticalCenter
                     color: toQuickMouse.containsMouse
@@ -481,6 +483,7 @@ Item {
                         { label: "\uf144  Video",  idx: 1 }
                     ]
                     delegate: Rectangle {
+                        GlassSheen {}
                         required property var modelData
                         width: tabLabel.implicitWidth + 18; height: 26; radius: 13
                         color: root.activeTab === modelData.idx
@@ -735,6 +738,7 @@ Item {
                 spacing: 6
 
                 Rectangle {
+                    GlassSheen {}
                     height: 18; width: countText.implicitWidth + 14; radius: 9
                     color: Qt.rgba(1,1,1,0.07)
                     anchors.verticalCenter: parent.verticalCenter
@@ -749,6 +753,7 @@ Item {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     height: 18; width: randomLabel.implicitWidth + 14; radius: 9
                     anchors.verticalCenter: parent.verticalCenter
                     color: randomMouse.containsMouse
@@ -769,6 +774,7 @@ Item {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     height: 18; width: stopAllLabel.implicitWidth + 14; radius: 9
                     anchors.verticalCenter: parent.verticalCenter
                     color: stopAllMouse.containsMouse
@@ -789,6 +795,7 @@ Item {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     height: 18; width: 18; radius: 9
                     anchors.verticalCenter: parent.verticalCenter
                     color: openFolderMouse.containsMouse
@@ -810,6 +817,7 @@ Item {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     height: 18; width: 18; radius: 9
                     anchors.verticalCenter: parent.verticalCenter
                     color: openConvMouse.containsMouse
@@ -883,6 +891,7 @@ Item {
                         { label: "\uf144  Video",   idx: 1 }
                     ]
                     delegate: Rectangle {
+                        GlassSheen {}
                         required property var modelData
                         width: quickTabLabel.implicitWidth + 18; height: 26; radius: 13
                         color: root.activeTab === modelData.idx
@@ -914,6 +923,7 @@ Item {
             }
 
             Rectangle {
+                GlassSheen {}
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter

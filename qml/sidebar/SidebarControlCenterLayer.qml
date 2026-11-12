@@ -19,11 +19,12 @@ PanelWindow {
     property string textFontFamily: ""
     property string heroFontFamily: ""
 
+    readonly property real glassBodyScale: Glass.enabled ? Glass.bodyScale : 1.0
     readonly property color bgColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
-            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue))
+            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
+            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
 
     readonly property color moduleColor:  Qt.rgba(1,1,1, gamemodeActive ? 0.03 : 0.05)
     readonly property color moduleHover:  Qt.rgba(1,1,1, gamemodeActive ? 0.06 : 0.09)
@@ -309,6 +310,7 @@ PanelWindow {
             clip: true
             Behavior on color { ColorAnimation { duration: 200 } }
         }
+        GlassSheen { cornerRadius: 28 }
 
         Column {
             id: contentCol
@@ -379,6 +381,7 @@ PanelWindow {
                     }
                     
                     Rectangle {
+                        GlassSheen {}
                         width: 26; height: 26; radius: 13
                         anchors.verticalCenter: parent.verticalCenter
                         color: root.hyprsunsetActive ? Qt.rgba(0.9,0.66,0.29,0.25)
@@ -407,6 +410,7 @@ PanelWindow {
                     }
                     
                     Rectangle {
+                        GlassSheen {}
                         width: 26; height: 26; radius: 13
                         anchors.verticalCenter: parent.verticalCenter
                         color: root.appearanceMenuOpen || appearBtnMouse.containsMouse
@@ -435,6 +439,7 @@ PanelWindow {
                 width: parent.width; height: 80; spacing: 12
 
                 Rectangle {
+                    GlassSheen {}
                     width: (parent.width - 12) / 2; height: parent.height; radius: 20
                     color: (wifiHover.containsMouse || root.wifiPanelOpen) ? root.moduleHover : root.moduleColor
                     border.width: 1
@@ -491,6 +496,7 @@ PanelWindow {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     width: (parent.width - 12) / 2; height: parent.height; radius: 20
                     color: (btHover.containsMouse || root.bluetoothPanelOpen) ? root.moduleHover : root.moduleColor
                     border.width: 1
@@ -548,6 +554,7 @@ PanelWindow {
             }
 
             Rectangle {
+                GlassSheen {}
                 width: parent.width; height: 56; radius: 20
                 color: gamemodeHover.containsMouse ? root.moduleHover : root.moduleColor
                 border.width: 1; border.color: Qt.rgba(1,1,1,0.16)
@@ -600,6 +607,7 @@ PanelWindow {
             }
 
             Rectangle {
+                GlassSheen {}
                 width: parent.width; height: 56; radius: 20
                 color: sidebarHover.containsMouse ? root.moduleHover : root.moduleColor
                 border.width: 1; border.color: Qt.rgba(1,1,1,0.16)
@@ -712,14 +720,20 @@ PanelWindow {
                 id: appearanceMenuDrawer
                 width: parent.width
                 height: root.appearanceMenuOpen ? appearanceMenuContent.implicitHeight + 12 : 0
-                clip: true
                 Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
+                // clip area is 4px larger than the drawer on the left, right and top so the card's outer glass edge isn't cut off
+                Item {
+                    id: appearanceMenuClip
+                    x: -4; y: -4
+                    width: parent.width + 8; height: parent.height + 4
+                    clip: true
                 Rectangle {
+                    GlassSheen {}
                     id: appearanceMenuContent
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
+                    anchors.top: parent.top; anchors.topMargin: 4
+                    anchors.left: parent.left; anchors.leftMargin: 4
+                    anchors.right: parent.right; anchors.rightMargin: 4
                     implicitHeight: appearanceColumn.implicitHeight + 28
                     radius: 20
                     color: Qt.rgba(1,1,1,0.05)
@@ -862,6 +876,7 @@ PanelWindow {
                             Repeater {
                                 model: [0.20, 0.40, 0.60, 0.80, 1.0]
                                 delegate: Rectangle {
+                                    GlassSheen {}
                                     required property real modelData
                                     readonly property bool isActive: Math.abs(root.capsuleOpacityValue - modelData) < 0.01
                                     width: presetLbl.implicitWidth + 16; height: 26; radius: 13
@@ -943,6 +958,7 @@ PanelWindow {
                             Behavior on opacity { NumberAnimation { duration: 150 } }
 
                             Rectangle {
+                                GlassSheen {}
                                 width: (parent.width - 6) / 2; height: 36; radius: 12
                                 color: root.dockEnabled && root.dockMode === "pin"
                                     ? Qt.rgba(1,1,1,0.15)
@@ -968,6 +984,7 @@ PanelWindow {
                             }
 
                             Rectangle {
+                                GlassSheen {}
                                 id: sbSmartBumpCard
                                 width: (parent.width - 6) / 2; height: 36; radius: 12
                                 clip: true
@@ -1046,6 +1063,7 @@ PanelWindow {
                         }
                     }
                 }
+                }
             }
         }
 
@@ -1069,6 +1087,7 @@ PanelWindow {
             clip: true
             Behavior on color { ColorAnimation { duration: 200 } }
         }
+        GlassSheen { cornerRadius: 20 }
 
         Column {
             id: wifiFlyoutContent
@@ -1215,6 +1234,7 @@ PanelWindow {
             clip: true
             Behavior on color { ColorAnimation { duration: 200 } }
         }
+        GlassSheen { cornerRadius: 20 }
 
         Column {
             id: btFlyoutContent

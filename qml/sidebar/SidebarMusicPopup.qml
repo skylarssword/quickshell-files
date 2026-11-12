@@ -26,11 +26,14 @@ PanelWindow {
     property string timePlayed:    "0:00"
     property string timeTotal:     "0:00"
 
+    // while Liquid Glass is on the body gets more see-through (same scale as the island)
+    readonly property real glassBodyScale: Glass.enabled ? Glass.bodyScale : 1.0
+
     readonly property color bgColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
-            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue))
+            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
+            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
 
     readonly property bool isPlaying: activePlayer !== null
         && activePlayer.playbackState === MprisPlaybackState.Playing
@@ -185,6 +188,8 @@ PanelWindow {
                 border.color: IslandMotion.surfaceBorderColor
                 clip: true
             }
+
+            GlassSheen { cornerRadius: 28 }
 
             Column {
                 anchors { fill: parent; margins: 18 }
@@ -653,6 +658,8 @@ PanelWindow {
                 border.color: IslandMotion.surfaceBorderColor
                 clip: true
             }
+
+            GlassSheen { cornerRadius: 28 }
 
             Rectangle {
                 id: backFlipBtn

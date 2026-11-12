@@ -1901,17 +1901,16 @@ id: mainCapsule
                 z: 5
                 property int morphDuration: IslandMotion.standard
                 readonly property int infoActiveTab: infoLoader.item ? infoLoader.item.activeTab : 0
-            // ── Liquid Glass (control center only) ──────────────────────────────
-            readonly property bool glassBody: islandContainer.controlCenterLayerVisible
-                && !!controlCenterLoader.item && controlCenterLoader.item.liquidGlass
+            // ── Liquid Glass (all island states except the workspace overview) ──────────────────────────────
+            readonly property bool glassBody: Glass.enabled && !root.overviewVisible
             // multiplies the body's black alpha while glass is on: 0.25 turns the 20% chip into 5%
-            readonly property real glassBodyScale: 0.25
+            readonly property real glassBodyScale: Glass.bodyScale
             readonly property real bodyAlphaScale: glassBody ? glassBodyScale : 1.0
-            readonly property real glassEdgeAlpha:   0.16   // dark hairline outside the edge (keeps it visible on white)
-            readonly property real glassShadowAlpha: 0.08   // soft shadow falloff outside that
-            readonly property real glassRimAlpha:    0.18   // bright inner rim
-            readonly property real glassGlowAlpha:   0.06   // soft light at the top
-            readonly property real glassGlintAlpha:  0.55   // peak of the specular line along the top edge
+            readonly property real glassEdgeAlpha:   Glass.bodyEdgeAlpha   // dark hairline outside the edge (keeps it visible on white)
+            readonly property real glassShadowAlpha: Glass.bodyShadowAlpha   // soft shadow falloff outside that
+            readonly property real glassRimAlpha:    Glass.bodyRimAlpha   // bright inner rim
+            readonly property real glassGlowAlpha:   Glass.bodyGlowAlpha   // soft light at the top
+            readonly property real glassGlintAlpha:  Glass.bodyGlintAlpha   // peak of the specular line along the top edge
             property real outlineWidth: IslandMotion.surfaceBorderWidth
             property color outlineColor: root.overviewContentVisible ? root.overviewCapsuleBorderColor : IslandMotion.surfaceBorderColor
             property real displayedWidth: baseTargetWidth
@@ -2938,7 +2937,7 @@ WorkspaceBubble {
             iconFontFamily: root.iconFontFamily
             useWalColor: root.capsuleUseWalColor
             walColor: root.capsuleWalColor
-            capsuleOpacityValue: root.capsuleOpacity
+            capsuleOpacityValue: root.capsuleOpacity * (Glass.enabled ? Glass.bodyScale : 1.0)
             gamemodeActive: root.gamemodeActive
             opacity: (root.bubblesEnabled && !root.idleMode && !root.sidebarEnabled) ? 1 : 0
             visible: opacity > 0.01
@@ -2946,12 +2945,21 @@ WorkspaceBubble {
             onDotClicked: function(workspaceId) { hyprDispatch.focusWorkspace(workspaceId) }
         }
 
+// glass for the systray bubble lives outside it: the bubble clips its own content, which would cut off the outer edge
+        Item {
+            x: systrayBubble.x; y: systrayBubble.y
+            width: systrayBubble.width; height: systrayBubble.height
+            opacity: systrayBubble.opacity
+            visible: systrayBubble.visible
+            GlassSheen { cornerRadius: systrayBubble.radius }
+        }
+
 SystrayBubble {
             id: systrayBubble
             x: root.width - width - 16
             useWalColor: root.capsuleUseWalColor
             walColor: root.capsuleWalColor
-            capsuleOpacityValue: root.capsuleOpacity
+            capsuleOpacityValue: root.capsuleOpacity * (Glass.enabled ? Glass.bodyScale : 1.0)
             gamemodeActive: root.gamemodeActive
             iconFontFamily: root.iconFontFamily
             textFontFamily: root.textFontFamily

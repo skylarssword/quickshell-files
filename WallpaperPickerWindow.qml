@@ -500,6 +500,7 @@ PanelWindow {
                 Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
                 Rectangle {
+                    GlassSheen {}
                     anchors {
                         left: parent.left; right: parent.right
                         verticalCenter: parent.verticalCenter
@@ -929,6 +930,7 @@ PanelWindow {
 
                 Rectangle {
                     id: mediaFilterButton
+                    GlassSheen {}
                     width: 36; height: 36; radius: 18
                     anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                     anchors.leftMargin: 28
@@ -957,6 +959,7 @@ PanelWindow {
 
                 Rectangle {
                     id: gridToggleButton
+                    GlassSheen {}
                     width: 36; height: 36; radius: 18
                     anchors.left: mediaFilterButton.right
                     anchors.verticalCenter: parent.verticalCenter
@@ -1047,6 +1050,7 @@ PanelWindow {
 
                 Rectangle {
                     id: randomButton
+                    GlassSheen {}
                     width: 36; height: 36; radius: 18
                     anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                     anchors.rightMargin: 28

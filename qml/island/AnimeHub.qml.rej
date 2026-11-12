@@ -1,0 +1,30 @@
+--- qml/island/AnimeHub.qml
++++ qml/island/AnimeHub.qml
+@@ -844,15 +844,15 @@
+                         }
+ 
+                         Rectangle {
+-                            GlassSheen { visible: rowItem.isOpen }
++                            GlassSheen { visible: rowItem.isCursor || rowItem.isOpen || rowMouse.containsMouse }
+                             x: rowItem.dragX
+                             y: rowItem.showSection ? 24 : 0
+                             width: parent.width
+                             height: 40
+                             radius: 20
+                             color: rowItem.isCursor
+-                                   ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.18 : 0.10)
+-                                   : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12)
++                                   ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.12 : 0.07)
++                                   : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06)
+                                       : (rowItem.isOpen ? Qt.rgba(1, 1, 1, 0.05) : "transparent"))
+                             Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+ 
+@@ -989,7 +989,7 @@
+                         anchors.leftMargin: 18
+                         anchors.rightMargin: 18
+                         anchors.verticalCenter: parent.verticalCenter
+-                        spacing: 0
++                        spacing: 2
+ 
+                         Text {
+                             renderType: Text.NativeRendering

@@ -15,11 +15,14 @@ PanelWindow {
     property real   capsuleOpacityValue: 0.20
     property bool   gamemodeActive:      false
 
+    // while Liquid Glass is on the body gets more see-through (same scale as the island)
+    readonly property real glassBodyScale: Glass.enabled ? Glass.bodyScale : 1.0
+
     readonly property color bgColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
-            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue))
+            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
+            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
 
     readonly property real toastW: 280
     readonly property real toastH: 64
@@ -96,6 +99,8 @@ PanelWindow {
             clip: true
             Behavior on color { ColorAnimation { duration: 200 } }
         }
+
+        GlassSheen { cornerRadius: 20 }
 
         Text {
             id: osdIcon

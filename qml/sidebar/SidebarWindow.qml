@@ -35,11 +35,14 @@ PanelWindow {
         (capsuleWalColorIndex >= 0 && capsuleWalColorIndex < capsuleWalColors.length)
         ? capsuleWalColors[capsuleWalColorIndex] : "#000000"
 
+    // while Liquid Glass is on the capsule body gets more see-through (same scale as the island)
+    readonly property real glassBodyScale: Glass.enabled ? Glass.bodyScale : 1.0
+
     readonly property color pillColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (capsuleUseWalColor
-            ? Qt.rgba(capsuleWalColor.r, capsuleWalColor.g, capsuleWalColor.b, capsuleOpacityValue)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue))
+            ? Qt.rgba(capsuleWalColor.r, capsuleWalColor.g, capsuleWalColor.b, capsuleOpacityValue * glassBodyScale)
+            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
 
     readonly property var hyprMonitor: screen
         ? Hyprland.monitorFor(screen) : Hyprland.focusedMonitor
@@ -632,6 +635,15 @@ PanelWindow {
     Process {
         id: gamemodeToggleExec
         command: ["bash", "-c", "~/.config/hypr/scripts/gamemode.sh"]
+    }
+
+    // glass for the sidebar capsule lives outside it: the capsule clips its own content, which would cut off the outer edge
+    Item {
+        x: sidePill.x; y: sidePill.y
+        width: sidePill.width; height: sidePill.height
+        opacity: sidePill.opacity
+        visible: sidePill.visible
+        GlassSheen { cornerRadius: root.pillRadius }
     }
 
     Rectangle {

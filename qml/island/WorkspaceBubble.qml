@@ -78,6 +78,7 @@ Item {
 
     Rectangle {
         id: mainPill
+        GlassSheen {}
         x: 0
         width: Math.max(70, contentRow.implicitWidth + root.sidePadding * 2)
         height: 38
@@ -187,6 +188,7 @@ Item {
 
     Rectangle {
         id: titleBubble
+        GlassSheen {}
         x: mainPill.width + root.bubbleGap
         y: 0
         height: 38

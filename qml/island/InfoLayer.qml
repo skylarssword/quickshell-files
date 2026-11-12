@@ -1208,6 +1208,7 @@ onAccepted: {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     width: parent.width
                     height: parent.height - 80
                     radius: 12
@@ -1215,7 +1216,6 @@ onAccepted: {
                     border.color: tideNotesEdit.activeFocus ? Qt.rgba(1,1,1,0.3) : Qt.rgba(1,1,1,0.1)
                     border.width: 1
                     Behavior on border.color { ColorAnimation { duration: 150 } }
-                    clip: true
                     MouseArea {
                         anchors.fill: parent
                         onClicked: tideNotesEdit.forceActiveFocus()
@@ -1227,6 +1227,7 @@ onAccepted: {
 
                         TextEdit {
                             id: tideNotesEdit
+                            renderType: TextEdit.NativeRendering
                             width: parent.width
                             color: "white"; font.pixelSize: 13; font.family: root.textFontFamily
                             wrapMode: TextEdit.Wrap

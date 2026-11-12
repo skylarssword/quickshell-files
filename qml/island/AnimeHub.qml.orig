@@ -75,6 +75,19 @@ Item {
     property bool _histLoaded: false
     property bool _resumeLoaded: false
 
+    // Auto: quit an episode at 90%+ and the next one starts after a short countdown.
+    property bool   autoplay: false
+    property int    countdown: 0             // seconds left, 0 = not counting down
+    property string noticeText: ""
+    property var    finishedMark: null       // { id, ep, mode } left by mpv at 90%+
+    property var    pendingAutoplay: null
+    property bool   _finishedLoaded: false
+    property bool   _autoplayLoaded: false
+
+    readonly property string footerText: playing ? "Getting stream…"
+        : (countdown > 0 ? "Next episode in " + countdown + "…  any key to cancel"
+        : (errorText !== "" ? errorText.replace(/\n/g, " · ") : noticeText))
+
     property bool _searchDirty: false
     property bool _epDirty: false
 
@@ -153,6 +166,32 @@ Item {
     }
 
     function toggleMode() { mode = mode === "sub" ? "dub" : "sub" }
+
+    function toggleAutoplay() {
+        autoplay = !autoplay
+        Quickshell.execDetached(["bash", backend, "autoplay", autoplay ? "on" : "off"])
+        if (!autoplay) cancelCountdown()
+    }
+
+    function notify(msg) {
+        noticeText = msg
+        noticeTimer.restart()
+    }
+
+    function startCountdown() {
+        if (!autoplay) return
+        countdown = 5
+        countdownTimer.restart()
+    }
+
+    // returns true when it actually cancelled, so key handlers can swallow the key
+    function cancelCountdown() {
+        if (countdown <= 0) return false
+        countdown = 0
+        countdownTimer.stop()
+        notify("Autoplay cancelled")
+        return true
+    }
 
     function selectAnime(id, title) {
         selectedId = id
@@ -239,6 +278,7 @@ Item {
         if (id === selectedId) {
             if (err.trim() !== "") {
                 episodes = []
+                pendingAutoplay = null
                 errorText = failureText(firstError(err))
             } else {
                 const eps = lines(out).map(l => l.trim())
@@ -253,6 +293,16 @@ Item {
                     watchedIdx = idx
                     epIndex = idx >= 0 ? Math.min(idx + 1, eps.length - 1) : 0
                 }
+                // Auto: the episode you just finished is done, line up the next one
+                if (pendingAutoplay && pendingAutoplay.id === id) {
+                    const ni = eps.indexOf(pendingAutoplay.ep) + 1
+                    if (ni > 0 && ni < eps.length) {
+                        watchedIdx = ni - 1
+                        epIndex = ni
+                        startCountdown()
+                    }
+                }
+                pendingAutoplay = null
                 Qt.callLater(() => epGrid.positionViewAtIndex(root.epIndex, GridView.Contain))
             }
         }
@@ -327,17 +377,38 @@ Item {
         maybeAutoContinue()
     }
 
-    // once history and saved spots are both in, select the latest show
+    function loadFinished(raw) {
+        const first = lines(raw)[0]
+        const f = first ? first.split("\t") : []
+        finishedMark = f.length >= 2 ? { id: f[0], ep: f[1], mode: f.length > 2 ? f[2] : "" } : null
+        _finishedLoaded = true
+        maybeAutoContinue()
+    }
+
+    // once history, saved spots, the Auto flag and the finished marker are in, select the latest show
     function maybeAutoContinue() {
-        if (!autoContinue || !_histLoaded || !_resumeLoaded) return
+        if (!autoContinue || !_histLoaded || !_resumeLoaded || !_finishedLoaded || !_autoplayLoaded) return
         if (selectedId !== "" || history.length === 0) return
         autoContinue = false
+
+        // finished at 90%+ with Auto on: open that show and count down to the next episode
+        if (autoplay && finishedMark) {
+            const h = history.find(x => x.id === finishedMark.id)
+            if (h) {
+                if (finishedMark.mode === "sub" || finishedMark.mode === "dub") mode = finishedMark.mode
+                pendingAutoplay = finishedMark
+                selectAnime(h.id, h.title)
+                return
+            }
+        }
         continueWatching()
     }
 
     Component.onCompleted: {
         historyProc.running = true
         resumeProc.running = true
+        autoplayProc.running = true
+        finishedProc.running = true
         versionProc.running = true
         focusInput()
     }
@@ -355,6 +426,27 @@ Item {
         interval: 9000
         repeat: false
         onTriggered: root.errorText = ""
+    }
+
+    Timer {
+        id: noticeTimer
+        interval: 2500
+        repeat: false
+        onTriggered: root.noticeText = ""
+    }
+
+    Timer {
+        id: countdownTimer
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            root.countdown -= 1
+            if (root.countdown <= 0) {
+                stop()
+                root.countdown = 0
+                root.playSelected()
+            }
+        }
     }
 
     Process {
@@ -428,6 +520,34 @@ Item {
     }
 
     Process {
+        id: autoplayProc
+        property string out: ""
+        command: ["bash", root.backend, "autoplay"]
+        stdout: SplitParser { onRead: autoplayProc.out += data + "\n" }
+        onRunningChanged: {
+            if (running) return
+            const o = out
+            out = ""
+            root.autoplay = root.lines(o).indexOf("on") >= 0
+            root._autoplayLoaded = true
+            root.maybeAutoContinue()
+        }
+    }
+
+    Process {
+        id: finishedProc
+        property string out: ""
+        command: ["bash", root.backend, "finished"]
+        stdout: SplitParser { onRead: finishedProc.out += data + "\n" }
+        onRunningChanged: {
+            if (running) return
+            const o = out
+            out = ""
+            root.loadFinished(o)
+        }
+    }
+
+    Process {
         id: versionProc
         property string out: ""
         command: ["bash", root.backend, "version"]
@@ -447,11 +567,17 @@ Item {
         anchors.fill: parent
 
         // update banner
-        Rectangle {
+        Item {
             width: parent.width
             height: root.showBanner ? root.bannerHeight : 0
             visible: root.showBanner
-            color: Qt.rgba(1.0, 0.76, 0.28, 0.10)
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.topMargin: 2
+                radius: 12
+                color: Qt.rgba(1.0, 0.76, 0.28, 0.10)
+            }
 
             Row {
                 anchors.centerIn: parent
@@ -480,18 +606,24 @@ Item {
             width: parent.width
             height: root.headerHeight
 
+            // rounded search pill, same look as the wallpaper hub's
             Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: 1
-                color: Qt.rgba(1, 1, 1, 0.08)
+                id: searchBox
+                GlassSheen {}
+                anchors.left: parent.left; anchors.leftMargin: 10
+                anchors.right: parent.right; anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                height: 30
+                radius: 15
+                color: Qt.rgba(1, 1, 1, 0.06)
+                border.color: Qt.rgba(1, 1, 1, 0.12)
+                border.width: 1
             }
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
+                anchors.leftMargin: 28
+                anchors.rightMargin: 28
                 spacing: 10
 
                 Text {
@@ -531,23 +663,32 @@ Item {
                         }
                     }
 
+                    // keys without their own handler below (letters, backspace, ...)
+                    Keys.onPressed: (event) => {
+                        if (root.cancelCountdown()) event.accepted = true
+                    }
+
                     Keys.onEscapePressed: {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "episodes") root.zone = "results"
                         else if (text.length > 0) text = ""
                         else root.closeRequested()
                     }
-                    Keys.onReturnPressed: root.activate()
-                    Keys.onEnterPressed: root.activate()
-                    Keys.onTabPressed: root.toggleMode()
+                    Keys.onReturnPressed: { if (!root.cancelCountdown()) root.activate() }
+                    Keys.onEnterPressed: { if (!root.cancelCountdown()) root.activate() }
+                    Keys.onTabPressed: { if (!root.cancelCountdown()) root.toggleMode() }
                     Keys.onUpPressed: {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "results") root.moveRow(-1)
                         else root.moveEp(-root.epCols)
                     }
                     Keys.onDownPressed: {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "results") root.moveRow(1)
                         else root.moveEp(root.epCols)
                     }
                     Keys.onLeftPressed: (event) => {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "episodes") {
                             if (root.epIndex % root.epCols === 0) root.zone = "results"
                             else root.moveEp(-1)
@@ -556,6 +697,7 @@ Item {
                         }
                     }
                     Keys.onRightPressed: (event) => {
+                        if (root.cancelCountdown()) return
                         if (root.zone === "episodes") {
                             root.moveEp(1)
                         } else if (root.episodes.length > 0 && cursorPosition >= text.length) {
@@ -609,19 +751,24 @@ Item {
                 width: root.resultsWidth
                 height: parent.height
 
+                // results card
                 Rectangle {
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    width: 1
-                    color: Qt.rgba(1, 1, 1, 0.08)
+                    id: resultsCard
+                    GlassSheen {}
+                    anchors.fill: parent
+                    anchors.leftMargin: 10; anchors.rightMargin: 5
+                    anchors.topMargin: 4; anchors.bottomMargin: 6
+                    radius: 20
+                    color: Qt.rgba(1, 1, 1, 0.05)
+                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                    border.width: 1
                 }
 
                 ListView {
                     id: resultsList
-                    anchors.fill: parent
-                    anchors.margins: 6
-                    anchors.rightMargin: 7
+                    anchors.fill: resultsCard
+                    anchors.margins: 4
+                    leftMargin: 4; rightMargin: 4; topMargin: 4; bottomMargin: 4   // content inset: rows stay where they were, the clip area is 4px bigger
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     model: root.rows
@@ -635,7 +782,7 @@ Item {
                         readonly property bool isCursor: index === root.resultIndex
                         readonly property bool isOpen: modelData.id === root.selectedId
 
-                        width: ListView.view.width
+                        width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
                         height: (showSection ? 24 : 0) + 42
 
                         // swipe-left-to-delete (same mechanism as the notification center)
@@ -678,7 +825,7 @@ Item {
                             y: rowItem.showSection ? 24 : 0
                             width: Math.max(0, -rowItem.dragX)
                             height: 40
-                            radius: 9
+                            radius: 20
                             clip: true
                             color: Qt.rgba(0.86, 0.26, 0.26, 1)
                             visible: rowItem.dragX < -4
@@ -697,24 +844,25 @@ Item {
                         }
 
                         Rectangle {
+                            GlassSheen { visible: rowItem.isOpen }
                             x: rowItem.dragX
                             y: rowItem.showSection ? 24 : 0
                             width: parent.width
                             height: 40
-                            radius: 9
+                            radius: 20
                             color: rowItem.isCursor
-                                   ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.12 : 0.07)
-                                   : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06)
+                                   ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.18 : 0.10)
+                                   : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12)
                                       : (rowItem.isOpen ? Qt.rgba(1, 1, 1, 0.05) : "transparent"))
                             Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
 
                             Column {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
+                                anchors.leftMargin: 16
+                                anchors.rightMargin: 16
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
+                                spacing: 0
 
                                 Text {
                                     renderType: Text.NativeRendering
@@ -812,33 +960,36 @@ Item {
                 }
             }
 
-            // right: episodes
+            // right: episodes card
             Item {
                 anchors.left: leftPanel.right
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
+                anchors.leftMargin: 5; anchors.rightMargin: 10
+                anchors.topMargin: 4; anchors.bottomMargin: 6
+
+                Rectangle {
+                    GlassSheen {}
+                    anchors.fill: parent
+                    radius: 20
+                    color: Qt.rgba(1, 1, 1, 0.05)
+                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                    border.width: 1
+                }
 
                 Item {
                     id: epHeader
                     width: parent.width
                     height: 46
 
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: 1
-                        color: Qt.rgba(1, 1, 1, 0.08)
-                    }
-
                     Column {
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 14
+                        anchors.leftMargin: 18
+                        anchors.rightMargin: 18
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
+                        spacing: 0
 
                         Text {
                             renderType: Text.NativeRendering
@@ -872,10 +1023,11 @@ Item {
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.margins: 10
+                    anchors.margins: 6
+                    leftMargin: 4; rightMargin: 4; topMargin: 4; bottomMargin: 4   // content inset: cells stay where they were
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
-                    cellWidth: Math.floor(width / root.epCols)
+                    cellWidth: Math.floor((width - leftMargin - rightMargin) / root.epCols)
                     cellHeight: 36
                     model: root.episodes
 
@@ -891,9 +1043,10 @@ Item {
                         height: epGrid.cellHeight
 
                         Rectangle {
+                            GlassSheen {}
                             anchors.fill: parent
                             anchors.margins: 2.5
-                            radius: 8
+                            radius: 14
                             color: epItem.isCursor
                                    ? Qt.rgba(1, 1, 1, root.zone === "episodes" ? 0.18 : 0.10)
                                    : (epMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12)
@@ -946,16 +1099,9 @@ Item {
             width: parent.width
             height: root.footerHeight
 
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: 1
-                color: Qt.rgba(1, 1, 1, 0.08)
-            }
-
             Row {
                 id: modePills
+                visible: root.countdown <= 0      // the footer is the countdown while it runs
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
@@ -964,6 +1110,7 @@ Item {
                 Repeater {
                     model: [ { key: "sub", label: "Sub" }, { key: "dub", label: "Dub" } ]
                     delegate: Rectangle {
+                        GlassSheen {}
                         required property var modelData
                         readonly property bool active: root.mode === modelData.key
                         width: 52; height: 26; radius: 13
@@ -991,9 +1138,55 @@ Item {
                     }
                 }
 
+                // Auto: play the next episode when one ends at 90%+. Green = on.
+                Rectangle {
+                    id: autoBtn
+                    GlassSheen {}
+                    width: 64; height: 26; radius: 13
+                    color: root.autoplay
+                           ? Qt.rgba(0.35, 0.85, 0.5, autoMouse.containsMouse ? 0.24 : 0.16)
+                           : (autoMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
+                    border.width: 1
+                    border.color: root.autoplay ? Qt.rgba(0.35, 0.85, 0.5, 0.55) : Qt.rgba(1, 1, 1, 0.15)
+                    Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+                    Behavior on border.color { ColorAnimation { duration: IslandMotion.micro } }
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 5
+                        Text {
+                            renderType: Text.NativeRendering
+                            text: "\uf04b"
+                            font.family: root.iconFontFamily
+                            font.pixelSize: 10
+                            color: root.autoplay ? Qt.rgba(0.45, 0.92, 0.6, 1.0) : "white"
+                            opacity: root.autoplay ? 1.0 : 0.5
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            renderType: Text.NativeRendering
+                            text: "Auto"
+                            font.family: root.textFontFamily
+                            font.pixelSize: 12
+                            color: root.autoplay ? Qt.rgba(0.45, 0.92, 0.6, 1.0) : "white"
+                            opacity: root.autoplay ? 1.0 : 0.5
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    MouseArea {
+                        id: autoMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: { root.toggleAutoplay(); root.focusInput() }
+                    }
+                }
+
                 // hold to clear all history; the bar fills while you hold
                 Rectangle {
                     id: clearBtn
+                    GlassSheen {}
                     visible: root.history.length > 0
                     property real hold: 0
                     width: 72; height: 26; radius: 13
@@ -1071,8 +1264,8 @@ Item {
 
             Text {
                 renderType: Text.NativeRendering
-                anchors.left: modePills.right
-                anchors.leftMargin: 14
+                anchors.left: parent.left
+                anchors.leftMargin: root.countdown > 0 ? 14 : modePills.width + 28
                 anchors.right: actionRow.left
                 anchors.rightMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
@@ -1080,9 +1273,11 @@ Item {
                 maximumLineCount: 1
                 font.family: root.textFontFamily
                 font.pixelSize: 11
-                color: root.errorText !== "" ? Qt.rgba(1.0, 0.62, 0.55, 0.95) : "white"
-                opacity: root.errorText !== "" || root.playing ? 1.0 : 0
-                text: root.playing ? "Getting stream…" : root.errorText.replace(/\n/g, " · ")
+                color: root.countdown > 0 ? Qt.rgba(0.45, 0.92, 0.6, 1.0)
+                       : (root.playing ? "white"
+                          : (root.errorText !== "" ? Qt.rgba(1.0, 0.62, 0.55, 0.95) : Qt.rgba(1, 1, 1, 0.55)))
+                opacity: root.footerText !== "" ? 1.0 : 0
+                text: root.footerText
             }
 
             Row {
@@ -1093,7 +1288,8 @@ Item {
                 spacing: 10
 
                 Rectangle {
-                    visible: root.history.length > 0
+                    GlassSheen {}
+                    visible: root.history.length > 0 && root.countdown <= 0
                     width: contRow.width + 20
                     height: 28
                     radius: 8
@@ -1133,6 +1329,7 @@ Item {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     readonly property bool canPlay: root.episodes.length > 0 && !root.playing
                     width: playRow.width + 28
                     height: 30
@@ -1175,6 +1372,18 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    // any click while counting down cancels it (the click still goes through)
+    MouseArea {
+        anchors.fill: parent
+        z: 100
+        enabled: root.countdown > 0
+        propagateComposedEvents: true
+        onPressed: function(mouse) {
+            root.cancelCountdown()
+            mouse.accepted = false
         }
     }
 }

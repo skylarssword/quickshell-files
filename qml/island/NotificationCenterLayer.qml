@@ -54,6 +54,7 @@ Item {
         }
 
         Rectangle {
+            GlassSheen {}
             id: dndBtn
             anchors.top: parent.top
             anchors.right: clearBellBtn.left
@@ -75,6 +76,7 @@ Item {
         }
 
         Rectangle {
+            GlassSheen {}
             id: clearBellBtn
             anchors.top: parent.top
             anchors.right: parent.right
@@ -124,12 +126,17 @@ Item {
 
         ListView {
             id: notifCenterListView
+            // list is 4px larger than before on every side and each row carries 4px of padding around its
+            // card, so the clipped list/row no longer cut off the card's outer glass edge (same as the sidebar)
             anchors.top: titleText.bottom
-            anchors.topMargin: 16
+            anchors.topMargin: 12
             anchors.left: parent.left
+            anchors.leftMargin: -4
             anchors.right: parent.right
+            anchors.rightMargin: -4
             anchors.bottom: parent.bottom
-            spacing: 8
+            anchors.bottomMargin: -4
+            spacing: 0
             clip: true
             visible: root.notificationHistory.length > 0
             model: root.notificationHistory.length
@@ -144,7 +151,7 @@ Item {
                 readonly property bool isExpanded: root.expandedIndex === index
                 readonly property bool hasBody: (entry.body || "") !== "" && entry.body !== entry.summary
                 width: ListView.view.width
-                height: isExpanded ? (hasBody ? 92 : 64) : 56
+                height: (isExpanded ? (hasBody ? 92 : 64) : 56) + 8
 
                 property real dragX: 0
                 property bool dragging: false
@@ -182,9 +189,9 @@ Item {
                 }
 
                 Rectangle {
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
+                    anchors.right: parent.right; anchors.rightMargin: 4
+                    anchors.top: parent.top; anchors.topMargin: 4
+                    anchors.bottom: parent.bottom; anchors.bottomMargin: 4
                     width: Math.max(0, -notifRow.dragX)
                     radius: 12
                     clip: true
@@ -206,12 +213,12 @@ Item {
 
                 Rectangle {
                     id: notifCard
-                    x: notifRow.dragX
-                    y: 0
-                    width: parent.width
-                    height: parent.height
+                    GlassSheen {}
+                    x: notifRow.dragX + 4
+                    y: 4
+                    width: parent.width - 8
+                    height: parent.height - 8
                     radius: 12
-                    clip: true
 
                     color: notifCardMouse.containsMouse || notifRow.isExpanded
        			? Qt.rgba(1,1,1,0.09)

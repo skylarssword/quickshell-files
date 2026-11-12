@@ -1,0 +1,121 @@
+import QtQuick
+
+// Liquid Glass overlay for one rounded card.
+// Usage: make it the FIRST child of the card so the card's own content stays on top:
+//     Rectangle { radius: 20; ...; GlassSheen {} }
+// It fills its parent, reads the corner radius from parent.radius, and fades with Glass.enabled.
+// Tuning numbers live in Glass.qml.
+Item {
+    id: sheen
+    anchors.fill: parent
+
+    // set false for cards inside a clipped drawer/list: their outer hairline and shadow would
+    // be cut off at the clip edge and show up as a broken, partial curve
+    property bool outerEdge: true
+
+    // override only if the parent has no `radius`
+    property real cornerRadius: -1
+    readonly property real cr: cornerRadius >= 0 ? cornerRadius
+        : ((parent && parent.radius !== undefined) ? parent.radius : 20)
+
+    opacity: Glass.enabled ? 1 : 0
+    visible: opacity > 0
+    Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+
+    // dark outer hairline + soft shadow: three 1px rings just outside the card
+    Repeater {
+        model: sheen.outerEdge ? 3 : 0
+        Rectangle {
+            required property int index
+            readonly property int k: index + 1
+            x: -k
+            y: -k
+            width: sheen.width + 2 * k
+            height: sheen.height + 2 * k
+            radius: sheen.cr + k
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(0, 0, 0, k === 1 ? Glass.edgeAlpha : Glass.shadowAlpha / (k - 1))
+        }
+    }
+
+    // cards that can't draw outside themselves (clipped drawers/lists) get the same dark
+    // edge drawn just INSIDE the card instead, so they keep their definition
+    Repeater {
+        model: sheen.outerEdge ? 0 : 2
+        Rectangle {
+            required property int index
+            readonly property int k: index + 1
+            x: k
+            y: k
+            width: sheen.width - 2 * k
+            height: sheen.height - 2 * k
+            radius: Math.max(0, sheen.cr - k)
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(0, 0, 0, k === 1 ? Glass.edgeAlpha : Glass.shadowAlpha)
+        }
+    }
+
+    // dark tint, a little deeper toward the bottom (light comes from above)
+    Rectangle {
+        anchors.fill: parent
+        radius: sheen.cr
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, Glass.tintAlpha * 0.4) }
+            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, Glass.tintAlpha * 1.4) }
+        }
+    }
+
+    // bright inner rim, stacked on the card's own border
+    Rectangle {
+        anchors.fill: parent
+        radius: sheen.cr
+        color: "transparent"
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, Glass.rimAlpha)
+    }
+
+    // soft light at the top, fading out, a faint bounce light at the bottom
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: 1
+        radius: Math.max(0, sheen.cr - 1)
+        gradient: Gradient {
+            GradientStop { position: 0.00; color: Qt.rgba(1, 1, 1, Glass.glowAlpha) }
+            GradientStop { position: 0.30; color: Qt.rgba(1, 1, 1, Glass.glowAlpha * 0.25) }
+            GradientStop { position: 0.72; color: Qt.rgba(1, 1, 1, 0.0) }
+            GradientStop { position: 1.00; color: Qt.rgba(1, 1, 1, 0.03) }
+        }
+    }
+
+    // specular glint along the top edge, brightest toward the left (light from top-left)
+    Rectangle {
+        x: sheen.cr * 0.8
+        y: 1
+        width: Math.max(0, sheen.width - sheen.cr * 1.6)
+        height: 1
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0.00; color: Qt.rgba(1, 1, 1, 0.0) }
+            GradientStop { position: 0.20; color: Qt.rgba(1, 1, 1, Glass.glintAlpha) }
+            GradientStop { position: 0.60; color: Qt.rgba(1, 1, 1, Glass.glintAlpha * 0.35) }
+            GradientStop { position: 1.00; color: Qt.rgba(1, 1, 1, 0.0) }
+        }
+    }
+
+    // softer glint along the bottom edge, brightest toward the right
+    Rectangle {
+        x: sheen.cr * 0.8
+        y: sheen.height - 2
+        width: Math.max(0, sheen.width - sheen.cr * 1.6)
+        height: 1
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0.00; color: Qt.rgba(1, 1, 1, 0.0) }
+            GradientStop { position: 0.40; color: Qt.rgba(1, 1, 1, 0.12) }
+            GradientStop { position: 0.80; color: Qt.rgba(1, 1, 1, 0.28) }
+            GradientStop { position: 1.00; color: Qt.rgba(1, 1, 1, 0.0) }
+        }
+    }
+}

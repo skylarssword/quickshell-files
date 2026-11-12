@@ -32,6 +32,8 @@ Rectangle {
     Behavior on color       { ColorAnimation { duration: 120 } }
     Behavior on border.color { ColorAnimation { duration: 120 } }
 
+    GlassSheen {}
+
     Item {
         anchors.fill: parent; anchors.margins: 12
 

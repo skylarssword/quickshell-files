@@ -17,11 +17,12 @@ PanelWindow {
     property real  capsuleOpacityValue: 0.20
     property bool  gamemodeActive:      false
 
+    readonly property real glassBodyScale: Glass.enabled ? Glass.bodyScale : 1.0
     readonly property color bgColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
-            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue))
+            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
+            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
 
     signal clearRequested()
     signal dismissRequested(int entryId)
@@ -77,6 +78,7 @@ PanelWindow {
             clip: true
             Behavior on color { ColorAnimation { duration: 200 } }
         }
+        GlassSheen { cornerRadius: 28 }
 
         Item {
             anchors.fill: parent
@@ -97,6 +99,7 @@ PanelWindow {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     id: dndBtn
                     anchors.right: clearBtn.left; anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
@@ -117,6 +120,7 @@ PanelWindow {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     id: clearBtn
                     anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                     width: 30; height: 30; radius: 15
@@ -154,11 +158,13 @@ PanelWindow {
 
             ListView {
                 id: notifList
-                anchors.top: titleRow.bottom; anchors.topMargin: 16
-                anchors.left: parent.left; anchors.leftMargin: 18
-                anchors.right: parent.right; anchors.rightMargin: 18
-                anchors.bottom: parent.bottom; anchors.bottomMargin: 12
-                spacing: 8; clip: true
+                // list is 4px larger than before on every side, and each row carries 4px of padding
+                // around its card, so the clipped list/row no longer cut off the card's outer glass edge
+                anchors.top: titleRow.bottom; anchors.topMargin: 12
+                anchors.left: parent.left; anchors.leftMargin: 14
+                anchors.right: parent.right; anchors.rightMargin: 14
+                anchors.bottom: parent.bottom; anchors.bottomMargin: 8
+                spacing: 0; clip: true
                 visible: root.notificationHistory.length > 0
                 
                 model: root.notificationHistory
@@ -175,7 +181,7 @@ PanelWindow {
                     readonly property bool hasBody:    (entry.body || "") !== "" && entry.body !== entry.summary
 
                     width:  notifList.width
-                    height: isExpanded ? (hasBody ? 92 : 64) : 56
+                    height: (isExpanded ? (hasBody ? 92 : 64) : 56) + 8
                     clip:   true
 
                     Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutQuart } }
@@ -211,8 +217,9 @@ PanelWindow {
                     }
 
                     Rectangle {
-                        anchors.right: parent.right
-                        anchors.top: parent.top; anchors.bottom: parent.bottom
+                        anchors.right: parent.right; anchors.rightMargin: 4
+                        anchors.top: parent.top; anchors.topMargin: 4
+                        anchors.bottom: parent.bottom; anchors.bottomMargin: 4
                         width: Math.max(0, -notifRow.dragX)
                         radius: 12; clip: true
                         color: StyleTokens.danger
@@ -231,9 +238,10 @@ PanelWindow {
 
                     Rectangle {
                         id: notifCard
-                        x: notifRow.dragX; y: 0
-                        width: parent.width; height: parent.height
-                        radius: 12; clip: true
+                        GlassSheen {}
+                        x: notifRow.dragX + 4; y: 4
+                        width: parent.width - 8; height: parent.height - 8
+                        radius: 12
                         color: cardMouse.containsMouse || notifRow.isExpanded
                                ? Qt.rgba(1,1,1,0.09) : Qt.rgba(1,1,1,0.05)
                         border.width: IslandMotion.surfaceBorderWidth

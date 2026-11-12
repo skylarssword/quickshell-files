@@ -520,6 +520,7 @@ Item {
                     font.pixelSize: 11; font.family: root.textFontFamily
                 }
                 Rectangle {
+                    GlassSheen {}
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: Math.min(cmdRunLabel.implicitWidth + 32, 460)
                     height: 36; radius: 12
@@ -600,6 +601,7 @@ Item {
                 property bool isSelected: root.selectedIndex === index
 
                 Rectangle {
+                    GlassSheen { visible: parent.parent.isSelected || gridAppMouse.containsMouse }
                     anchors.centerIn: parent
                     width: parent.width - 6
                     height: parent.height - 6

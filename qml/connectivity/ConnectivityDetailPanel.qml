@@ -84,8 +84,11 @@ Item {
         anchors.fill: parent
         radius: 28
         color: StyleTokens.module
-        opacity: 0.9
+        opacity: Glass.enabled ? 0.9 * Glass.bodyScale : 0.9
+        Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
     }
+
+    GlassSheen { cornerRadius: 28 }
 
     Item {
         id: contentRoot
@@ -265,6 +268,7 @@ Item {
             }
 
             Rectangle {
+                GlassSheen { outerEdge: false }
                 id: bluetoothPairingPrompt
                 width: parent.width
                 height: visible
@@ -447,6 +451,7 @@ Item {
             }
 
             Rectangle {
+                GlassSheen { outerEdge: false }
                 id: wifiPasswordPrompt
                 width: parent.width
                 height: visible ? 92 : 0

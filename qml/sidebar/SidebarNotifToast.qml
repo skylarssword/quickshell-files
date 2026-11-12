@@ -15,11 +15,12 @@ PanelWindow {
     property real  capsuleOpacityValue: 0.20
     property bool  gamemodeActive:      false
 
+    readonly property real glassBodyScale: Glass.enabled ? Glass.bodyScale : 1.0
     readonly property color bgColor: gamemodeActive
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
-            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue))
+            ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
+            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
 
     readonly property real toastW: 320
     readonly property real toastH: 56
@@ -101,6 +102,8 @@ PanelWindow {
 
             Behavior on color { ColorAnimation { duration: 200 } }
         }
+
+        GlassSheen { cornerRadius: 20 }
 
         Row {
             anchors.fill: parent

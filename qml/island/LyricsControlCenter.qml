@@ -556,14 +556,26 @@ Item {
         }
 
         Item {
+            id: cardsHolder
             width: parent.width
             height: controlCenter.expandedView ? 0 : 80
-            clip: true
             visible: height > 0
 
             Behavior on height {
                 NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
             }
+            // holder is 4px bigger than the panel on left/right/top and (once open) bottom, so the card's
+            // outer glass edge isn't clipped. `inner` is the original panel area; children are unchanged.
+            Item {
+                id: cardsHolderPad
+                x: -4; y: -4
+                width: parent.width + 8; height: parent.height + 4 + Math.min(4, parent.height)
+                clip: true
+                Item {
+                    id: cardsHolderInner
+                    x: 4; y: 4
+                    width: cardsHolder.width; height: cardsHolder.height
+
 
             Row {
                 id: cardsRow
@@ -571,6 +583,7 @@ Item {
                 spacing: 12
 
  Rectangle {
+     GlassSheen {}
                     id: lrclibCard
                     width: (cardsRow.width - cardsRow.spacing) / 2
                     height: cardsRow.height
@@ -688,6 +701,7 @@ MouseArea {
                 }
 
 Rectangle {
+    GlassSheen {}
                     id: localFileCard
                     width: (cardsRow.width - cardsRow.spacing) / 2
                     height: cardsRow.height
@@ -787,6 +801,9 @@ MouseArea {
                     }
                 }
             }
+        
+                }
+            }
         }
 
         Item {
@@ -795,14 +812,26 @@ MouseArea {
             height: (!controlCenter.expandedView && lrclibPanelOpen)
                 ? Math.min(lrclibResultsColumn.implicitHeight + 16, 150)
                 : 0
-            clip: true
             visible: height > 0
 
             Behavior on height {
                 NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
             }
+            // holder is 4px bigger than the panel on left/right/top and (once open) bottom, so the card's
+            // outer glass edge isn't clipped. `inner` is the original panel area; children are unchanged.
+            Item {
+                id: lrclibResultsPanelPad
+                x: -4; y: -4
+                width: parent.width + 8; height: parent.height + 4 + Math.min(4, parent.height)
+                clip: true
+                Item {
+                    id: lrclibResultsPanelInner
+                    x: 4; y: 4
+                    width: lrclibResultsPanel.width; height: lrclibResultsPanel.height
+
 
 Rectangle {
+    GlassSheen {}
                 anchors.fill: parent
                 radius: 20
                 color: Qt.rgba(1,1,1,0.05)
@@ -976,20 +1005,35 @@ Rectangle {
                     }
                 }
             }
+        
+                }
+            }
         }
 
         Item {
             id: localFilePanel
             width: parent.width
             height: (!controlCenter.expandedView && localFilePanelOpen) ? localFileContent.implicitHeight + 16 : 0
-            clip: true
             visible: height > 0
 
             Behavior on height {
                 NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
             }
+            // holder is 4px bigger than the panel on left/right/top and (once open) bottom, so the card's
+            // outer glass edge isn't clipped. `inner` is the original panel area; children are unchanged.
+            Item {
+                id: localFilePanelPad
+                x: -4; y: -4
+                width: parent.width + 8; height: parent.height + 4 + Math.min(4, parent.height)
+                clip: true
+                Item {
+                    id: localFilePanelInner
+                    x: 4; y: 4
+                    width: localFilePanel.width; height: localFilePanel.height
+
 
 Rectangle {
+    GlassSheen {}
                 anchors.fill: parent
                 radius: 20
                 color: Qt.rgba(1,1,1,0.05)
@@ -1042,6 +1086,9 @@ Rectangle {
                     }
                 }
             }
+        
+                }
+            }
         }
 
         Item {
@@ -1051,14 +1098,26 @@ Rectangle {
                 ? 0
                 : (controlCenter.expandedView ? controlCenter.expandedViewerHeight : controlCenter.viewerHeight)
 
-            clip: true
             visible: height > 0
 
             Behavior on height {
                 NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
             }
+            // holder is 4px bigger than the panel on left/right/top and (once open) bottom, so the card's
+            // outer glass edge isn't clipped. `inner` is the original panel area; children are unchanged.
+            Item {
+                id: lyricViewerPad
+                x: -4; y: -4
+                width: parent.width + 8; height: parent.height + 4 + Math.min(4, parent.height)
+                clip: true
+                Item {
+                    id: lyricViewerInner
+                    x: 4; y: 4
+                    width: lyricViewer.width; height: lyricViewer.height
+
 
             Rectangle {
+                GlassSheen {}
                 anchors.fill: parent
                 radius: 16
                 color: Qt.rgba(1,1,1,0.05)
@@ -1497,6 +1556,9 @@ Item {
                             }
                         }
                     }
+                }
+            }
+        
                 }
             }
         }

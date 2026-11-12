@@ -239,6 +239,16 @@ PanelWindow {
                 notifCenter.close(); controlCenter.close(); powerMenu.close()
             }
         }
+        // Called by scripts/ani-backend after mpv exits. Returns "sidebar" when it
+        // handled the reopen; anything else tells the caller to use the island.
+        function openAnime(): string {
+            if (!root.sidebarEnabled) return "island"
+            screenshotGallery.close()
+            musicPopup.close(); infoPopup.close()
+            notifCenter.close(); controlCenter.close(); powerMenu.close()
+            appLauncher.openAnime()
+            return "sidebar"
+        }
         function toggleControlCenter(): void {
             controlCenter.toggle()
             if (controlCenter.popupOpen) {

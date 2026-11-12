@@ -567,11 +567,17 @@ Item {
         anchors.fill: parent
 
         // update banner
-        Rectangle {
+        Item {
             width: parent.width
             height: root.showBanner ? root.bannerHeight : 0
             visible: root.showBanner
-            color: Qt.rgba(1.0, 0.76, 0.28, 0.10)
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.topMargin: 2
+                radius: 12
+                color: Qt.rgba(1.0, 0.76, 0.28, 0.10)
+            }
 
             Row {
                 anchors.centerIn: parent
@@ -600,18 +606,24 @@ Item {
             width: parent.width
             height: root.headerHeight
 
+            // rounded search pill, same look as the wallpaper hub's
             Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: 1
-                color: Qt.rgba(1, 1, 1, 0.08)
+                id: searchBox
+                GlassSheen {}
+                anchors.left: parent.left; anchors.leftMargin: 10
+                anchors.right: parent.right; anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                height: 30
+                radius: 15
+                color: Qt.rgba(1, 1, 1, 0.06)
+                border.color: Qt.rgba(1, 1, 1, 0.12)
+                border.width: 1
             }
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
+                anchors.leftMargin: 28
+                anchors.rightMargin: 28
                 spacing: 10
 
                 Text {
@@ -739,19 +751,24 @@ Item {
                 width: root.resultsWidth
                 height: parent.height
 
+                // results card
                 Rectangle {
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    width: 1
-                    color: Qt.rgba(1, 1, 1, 0.08)
+                    id: resultsCard
+                    GlassSheen {}
+                    anchors.fill: parent
+                    anchors.leftMargin: 10; anchors.rightMargin: 5
+                    anchors.topMargin: 4; anchors.bottomMargin: 6
+                    radius: 20
+                    color: Qt.rgba(1, 1, 1, 0.05)
+                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                    border.width: 1
                 }
 
                 ListView {
                     id: resultsList
-                    anchors.fill: parent
-                    anchors.margins: 6
-                    anchors.rightMargin: 7
+                    anchors.fill: resultsCard
+                    anchors.margins: 4
+                    leftMargin: 4; rightMargin: 4; topMargin: 4; bottomMargin: 4   // content inset: rows stay where they were, the clip area is 4px bigger
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     model: root.rows
@@ -765,7 +782,7 @@ Item {
                         readonly property bool isCursor: index === root.resultIndex
                         readonly property bool isOpen: modelData.id === root.selectedId
 
-                        width: ListView.view.width
+                        width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
                         height: (showSection ? 24 : 0) + 42
 
                         // swipe-left-to-delete (same mechanism as the notification center)
@@ -793,14 +810,15 @@ Item {
                         Text {
                             renderType: Text.NativeRendering
                             visible: rowItem.showSection
-                            text: rowItem.modelData.section.toUpperCase()
+                            text: rowItem.modelData.section
                             font.family: root.textFontFamily
-                            font.pixelSize: 9
+			    font.weight: Font.Medium
+                            font.pixelSize: 13
                             font.letterSpacing: 1
                             color: "white"
-                            opacity: 0.25
+                            opacity: 0.95
                             x: 10
-                            y: 8
+                            y: -7
                         }
 
                         Rectangle {
@@ -808,7 +826,7 @@ Item {
                             y: rowItem.showSection ? 24 : 0
                             width: Math.max(0, -rowItem.dragX)
                             height: 40
-                            radius: 9
+                            radius: 20
                             clip: true
                             color: Qt.rgba(0.86, 0.26, 0.26, 1)
                             visible: rowItem.dragX < -4
@@ -827,11 +845,12 @@ Item {
                         }
 
                         Rectangle {
+                            GlassSheen { visible: rowItem.isCursor || rowItem.isOpen || rowMouse.containsMouse }
                             x: rowItem.dragX
                             y: rowItem.showSection ? 24 : 0
                             width: parent.width
                             height: 40
-                            radius: 9
+                            radius: 20
                             color: rowItem.isCursor
                                    ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.12 : 0.07)
                                    : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06)
@@ -841,10 +860,10 @@ Item {
                             Column {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
+                                anchors.leftMargin: 16
+                                anchors.rightMargin: 16
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
+                                spacing: -5
 
                                 Text {
                                     renderType: Text.NativeRendering
@@ -942,31 +961,34 @@ Item {
                 }
             }
 
-            // right: episodes
+            // right: episodes card
             Item {
                 anchors.left: leftPanel.right
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
+                anchors.leftMargin: 5; anchors.rightMargin: 10
+                anchors.topMargin: 4; anchors.bottomMargin: 6
+
+                Rectangle {
+                    GlassSheen {}
+                    anchors.fill: parent
+                    radius: 20
+                    color: Qt.rgba(1, 1, 1, 0.05)
+                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                    border.width: 1
+                }
 
                 Item {
                     id: epHeader
                     width: parent.width
                     height: 46
 
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: 1
-                        color: Qt.rgba(1, 1, 1, 0.08)
-                    }
-
                     Column {
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 14
+                        anchors.leftMargin: 18
+                        anchors.rightMargin: 18
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 2
 
@@ -1002,10 +1024,11 @@ Item {
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.margins: 10
+                    anchors.margins: 6
+                    leftMargin: 4; rightMargin: 4; topMargin: 4; bottomMargin: 4   // content inset: cells stay where they were
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
-                    cellWidth: Math.floor(width / root.epCols)
+                    cellWidth: Math.floor((width - leftMargin - rightMargin) / root.epCols)
                     cellHeight: 36
                     model: root.episodes
 
@@ -1021,9 +1044,10 @@ Item {
                         height: epGrid.cellHeight
 
                         Rectangle {
+                            GlassSheen {}
                             anchors.fill: parent
                             anchors.margins: 2.5
-                            radius: 8
+                            radius: 14
                             color: epItem.isCursor
                                    ? Qt.rgba(1, 1, 1, root.zone === "episodes" ? 0.18 : 0.10)
                                    : (epMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12)
@@ -1076,14 +1100,6 @@ Item {
             width: parent.width
             height: root.footerHeight
 
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: 1
-                color: Qt.rgba(1, 1, 1, 0.08)
-            }
-
             Row {
                 id: modePills
                 visible: root.countdown <= 0      // the footer is the countdown while it runs
@@ -1095,6 +1111,7 @@ Item {
                 Repeater {
                     model: [ { key: "sub", label: "Sub" }, { key: "dub", label: "Dub" } ]
                     delegate: Rectangle {
+                        GlassSheen {}
                         required property var modelData
                         readonly property bool active: root.mode === modelData.key
                         width: 52; height: 26; radius: 13
@@ -1125,6 +1142,7 @@ Item {
                 // Auto: play the next episode when one ends at 90%+. Green = on.
                 Rectangle {
                     id: autoBtn
+                    GlassSheen {}
                     width: 64; height: 26; radius: 13
                     color: root.autoplay
                            ? Qt.rgba(0.35, 0.85, 0.5, autoMouse.containsMouse ? 0.24 : 0.16)
@@ -1169,6 +1187,7 @@ Item {
                 // hold to clear all history; the bar fills while you hold
                 Rectangle {
                     id: clearBtn
+                    GlassSheen {}
                     visible: root.history.length > 0
                     property real hold: 0
                     width: 72; height: 26; radius: 13
@@ -1270,6 +1289,7 @@ Item {
                 spacing: 10
 
                 Rectangle {
+                    GlassSheen {}
                     visible: root.history.length > 0 && root.countdown <= 0
                     width: contRow.width + 20
                     height: 28
@@ -1310,6 +1330,7 @@ Item {
                 }
 
                 Rectangle {
+                    GlassSheen {}
                     readonly property bool canPlay: root.episodes.length > 0 && !root.playing
                     width: playRow.width + 28
                     height: 30

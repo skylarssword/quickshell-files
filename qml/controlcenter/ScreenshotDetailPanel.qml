@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import Quickshell.Io
 import IslandBackend
+import "../shared"
 
 Item {
     id: panel
@@ -87,6 +88,7 @@ Process {
 
             Rectangle {
                 id: refreshBtn
+                GlassSheen {}
                 width: 28; height: 28; radius: 8
                 color: refMouse.containsMouse ? Qt.rgba(1,1,1,0.12) : Qt.rgba(1,1,1,0.06)
                 Behavior on color { ColorAnimation { duration: 120 } }
@@ -129,6 +131,7 @@ Process {
                         { id: "active", icon: "\uf2d0", label: "Window" }
                     ]
                     delegate: Rectangle {
+                        GlassSheen {}
                         required property var modelData
                         property bool sel: panel.screenshotMode === modelData.id
                         width: (parent.width - 12) / 3
@@ -191,6 +194,7 @@ Process {
                         { val: 10, label: "10s" }
                     ]
                     delegate: Rectangle {
+                        GlassSheen {}
                         required property var modelData
                         property bool sel: panel.screenshotDelay === modelData.val
                         width: (parent.width - 18) / 4
@@ -220,6 +224,7 @@ Process {
         }
 
         Rectangle {
+            GlassSheen {}
             width: parent.width; height: 44; radius: 14
             color: captureBtnMouse.containsMouse ? Qt.rgba(1,1,1,0.22) : Qt.rgba(1,1,1,0.14)
             border.color: Qt.rgba(1,1,1,0.3); border.width: 1
@@ -267,6 +272,7 @@ Process {
                 }
                 Rectangle {
                     id: openFolderBtn
+                    GlassSheen {}
                     width: 28; height: 28; radius: 8
                     color: folderMouse.containsMouse ? Qt.rgba(1,1,1,0.12) : Qt.rgba(1,1,1,0.06)
                     Behavior on color { ColorAnimation { duration: 120 } }
@@ -298,7 +304,6 @@ Item {
                        - 28        
                        - 12        
                        - 6
-                clip: true
 
                 Text {
                     renderType: Text.NativeRendering
@@ -311,6 +316,8 @@ Item {
 
 ListView {
                     anchors.fill: parent
+                    anchors.margins: -4
+                    leftMargin: 4; rightMargin: 4; topMargin: 4; bottomMargin: 4   // content inset: rows stay where they were, the clip area is 4px bigger
                     model: recentModel
                     spacing: 6
                     clip: true
@@ -337,8 +344,8 @@ ListView {
                         required property string ssPath
                         required property string ssName
 
-width: ListView.view.width; height: 60; radius: 12
-                        clip: true
+GlassSheen {}
+                        width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin; height: 60; radius: 12
                         color: rowMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.04)
                         border.color: Qt.rgba(1,1,1,0.1); border.width: 1
                         Behavior on color { ColorAnimation { duration: 120 } }

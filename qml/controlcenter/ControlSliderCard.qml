@@ -3,6 +3,7 @@ import IslandBackend
 import "../shared"
 
 Rectangle {
+    GlassSheen {}
     id: root
 
     signal interactionStarted()

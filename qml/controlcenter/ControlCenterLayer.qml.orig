@@ -55,97 +55,6 @@ signal bubblesToggleRequested()
 
     readonly property var userConfig: UserConfig
 
-    // ── liquid glass ──────────────────────────────────────────────────────────
-    // Off by default. The on/off choice is kept in a tiny state file so it survives restarts.
-    property bool liquidGlass: false
-
-    function setLiquidGlass(on) {
-        liquidGlass = on
-        glassStateWrite.running = false
-        glassStateWrite.command = ["sh", "-c",
-            'd="${XDG_STATE_HOME:-$HOME/.local/state}/tide-island"; mkdir -p "$d" && echo '
-            + (on ? "on" : "off") + ' > "$d/liquid-glass"']
-        glassStateWrite.running = true
-    }
-
-    Process {
-        id: glassStateRead
-        running: true
-        command: ["sh", "-c", 'cat "${XDG_STATE_HOME:-$HOME/.local/state}/tide-island/liquid-glass" 2>/dev/null']
-        stdout: SplitParser {
-            onRead: (data) => controlCenter.liquidGlass = (data.trim() === "on")
-        }
-    }
-
-    Process { id: glassStateWrite }
-
-    // Glass overlay for one rounded card. Drop it in as the first child of the card
-    // (so the card's own content stays on top) and bind `active` to liquidGlass.
-    // It reads the card's corner radius from its parent. Inline components can't see
-    // outer ids, which is why `active` is passed in.
-    component GlassSheen: Item {
-        id: sheen
-        property bool active: false
-        readonly property real cr: (parent && parent.radius !== undefined) ? parent.radius : 20
-
-        anchors.fill: parent
-        opacity: active ? 1 : 0
-        visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
-
-        // brighter rim, stacked on the card's own border
-        Rectangle {
-            anchors.fill: parent
-            radius: sheen.cr
-            color: "transparent"
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.10)
-        }
-
-        // inner light: bright at the top, fading out, a little bounce light at the bottom
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Math.max(0, sheen.cr - 1)
-            gradient: Gradient {
-                GradientStop { position: 0.00; color: Qt.rgba(1, 1, 1, 0.14) }
-                GradientStop { position: 0.30; color: Qt.rgba(1, 1, 1, 0.035) }
-                GradientStop { position: 0.72; color: Qt.rgba(1, 1, 1, 0.0) }
-                GradientStop { position: 1.00; color: Qt.rgba(1, 1, 1, 0.06) }
-            }
-        }
-
-        // specular glint along the top edge, brightest toward the left (light from top-left)
-        Rectangle {
-            x: sheen.cr * 0.8
-            y: 1
-            width: Math.max(0, sheen.width - sheen.cr * 1.6)
-            height: 1
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.00; color: Qt.rgba(1, 1, 1, 0.0) }
-                GradientStop { position: 0.20; color: Qt.rgba(1, 1, 1, 0.65) }
-                GradientStop { position: 0.60; color: Qt.rgba(1, 1, 1, 0.22) }
-                GradientStop { position: 1.00; color: Qt.rgba(1, 1, 1, 0.0) }
-            }
-        }
-
-        // softer glint along the bottom edge, brightest toward the right
-        Rectangle {
-            x: sheen.cr * 0.8
-            y: sheen.height - 2
-            width: Math.max(0, sheen.width - sheen.cr * 1.6)
-            height: 1
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.00; color: Qt.rgba(1, 1, 1, 0.0) }
-                GradientStop { position: 0.40; color: Qt.rgba(1, 1, 1, 0.14) }
-                GradientStop { position: 0.80; color: Qt.rgba(1, 1, 1, 0.34) }
-                GradientStop { position: 1.00; color: Qt.rgba(1, 1, 1, 0.0) }
-            }
-        }
-    }
-
     property bool showCondition: false
     property string iconFontFamily: userConfig.iconFontFamily
     property string textFontFamily: userConfig.textFontFamily
@@ -1392,7 +1301,7 @@ Text {
                                   ? "#e5a84b"
                                   : (sunsetBtnMouse.containsMouse ? Qt.rgba(1,1,1,0.4) : Qt.rgba(1,1,1,0.2))
                     border.width: 1
-                    GlassSheen { active: controlCenter.liquidGlass }
+                    GlassSheen {}
 
                     Behavior on color { ColorAnimation { duration: 150 } }
                     Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -1441,7 +1350,7 @@ Text {
                                   ? Qt.rgba(1,1,1,0.4)
                                   : (appearanceBtnMouse.containsMouse ? Qt.rgba(1,1,1,0.3) : Qt.rgba(1,1,1,0.2))
                     border.width: 1
-                    GlassSheen { active: controlCenter.liquidGlass }
+                    GlassSheen {}
 
                     Behavior on color { ColorAnimation { duration: 150 } }
                     Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -1489,7 +1398,7 @@ Rectangle {
                     color: (wifiCardMouse.containsMouse || wifiPanelOpen) ? Qt.rgba(1,1,1,0.09) : Qt.rgba(1,1,1,0.05)
                     border.width: 1
                     border.color: (wifiCardMouse.containsMouse || wifiPanelOpen) ? Qt.rgba(1,1,1,0.30) : Qt.rgba(1,1,1,0.16)
-                    GlassSheen { active: controlCenter.liquidGlass }
+                    GlassSheen {}
 
                     Behavior on color {
                         ColorAnimation {
@@ -1628,7 +1537,7 @@ Rectangle {
                     color: (bluetoothCardMouse.containsMouse || bluetoothPanelOpen) ? Qt.rgba(1,1,1,0.09) : Qt.rgba(1,1,1,0.05)
                     border.width: 1
                     border.color: (bluetoothCardMouse.containsMouse || bluetoothPanelOpen) ? Qt.rgba(1,1,1,0.30) : Qt.rgba(1,1,1,0.16)
-                    GlassSheen { active: controlCenter.liquidGlass }
+                    GlassSheen {}
 
                     Behavior on color {
                         ColorAnimation {
@@ -1790,7 +1699,7 @@ Rectangle {
                 color: Qt.rgba(1,1,1,0.05)
                 border.width: 1
                 border.color: Qt.rgba(1,1,1,0.16)
-                GlassSheen { active: controlCenter.liquidGlass }
+                GlassSheen {}
                 opacity: Math.min(1, controlCenter.batteryDrawerProgress * 1.35)
                 clip: true
 
@@ -2131,7 +2040,7 @@ Rectangle {
                 color: Qt.rgba(1,1,1,0.05)
                 border.width: 1
                 border.color: Qt.rgba(1,1,1,0.16)
-                GlassSheen { active: controlCenter.liquidGlass }
+                GlassSheen {}
                 opacity: Math.min(1, controlCenter.batteryDrawerProgress * 1.35)
                 clip: true
 
@@ -2326,7 +2235,7 @@ Rectangle {
             trackColor: controlCenter.trackColor
             textPrimary: controlCenter.textPrimary
             textSecondary: controlCenter.textSecondary
-            GlassSheen { active: controlCenter.liquidGlass }
+            GlassSheen {}
 
             onInteractionStarted: {
                 if (controlCenter.sliderIntroPending) {
@@ -2365,7 +2274,7 @@ ControlSliderCard {
             trackColor: controlCenter.trackColor
             textPrimary: controlCenter.textPrimary
             textSecondary: controlCenter.textSecondary
-            GlassSheen { active: controlCenter.liquidGlass }
+            GlassSheen {}
 
             onInteractionStarted: {
                 if (controlCenter.sliderIntroPending) {
@@ -2401,7 +2310,6 @@ ControlSliderCard {
             id: appearanceMenuDrawer
             width: parent.width
             height: appearanceMenuContent.implicitHeight + 12
-            clip: true
 
 Rectangle {
                 id: appearanceMenuContent
@@ -2413,7 +2321,7 @@ Rectangle {
                 color: Qt.rgba(1,1,1,0.05)
                 border.width: 1
                 border.color: Qt.rgba(1,1,1,0.16)
-                GlassSheen { active: controlCenter.liquidGlass }
+                GlassSheen {}
 
                 Column {
                     id: appearanceColumn
@@ -2509,7 +2417,7 @@ MouseArea {
                                     width: 34
                                     height: 20
                                     radius: 10
-                                    color: controlCenter.liquidGlass ? StyleTokens.success : StyleTokens.switchOff
+                                    color: Glass.enabled ? StyleTokens.success : StyleTokens.switchOff
 
                                     Behavior on color {
                                         ColorAnimation { duration: StyleTokens.durationFast }
@@ -2520,7 +2428,7 @@ MouseArea {
                                         height: 16
                                         radius: 8
                                         y: 2
-                                        x: controlCenter.liquidGlass ? 16 : 2
+                                        x: Glass.enabled ? 16 : 2
                                         color: StyleTokens.white
 
                                         Behavior on x {
@@ -2530,7 +2438,7 @@ MouseArea {
 
                                     MouseArea {
                                         anchors.fill: parent
-                                        onClicked: controlCenter.setLiquidGlass(!controlCenter.liquidGlass)
+                                        onClicked: Glass.setEnabled(!Glass.enabled)
                                     }
                                 }
                             }
@@ -2724,7 +2632,6 @@ Rectangle {
             id: dockSettingsDrawer
             width: parent.width
             height: dockSettingsContent.implicitHeight + 12
-            clip: true
 
             Rectangle {
                 id: dockSettingsContent
@@ -2736,7 +2643,7 @@ Rectangle {
                 color:  Qt.rgba(1,1,1,0.05)
                 border.width: 1
                 border.color: Qt.rgba(1,1,1,0.16)
-                GlassSheen { active: controlCenter.liquidGlass }
+                GlassSheen {}
 
                 Column {
                     id: dockColumn
@@ -3034,7 +2941,6 @@ Rectangle {
             id: islandSettingsDrawer
             width: parent.width
             height: islandSettingsContent.implicitHeight + 12
-            clip: true
 
             Rectangle {
                 id: islandSettingsContent
@@ -3046,7 +2952,7 @@ Rectangle {
                 color: Qt.rgba(1,1,1,0.05)
                 border.width: 1
                 border.color: Qt.rgba(1,1,1,0.16)
-                GlassSheen { active: controlCenter.liquidGlass }
+                GlassSheen {}
 
                 Column {
                     id: islandSettingsColumn
