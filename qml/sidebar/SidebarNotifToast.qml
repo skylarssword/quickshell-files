@@ -20,7 +20,7 @@ PanelWindow {
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
             ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
+            : Glass.bodyFill(capsuleOpacityValue * glassBodyScale))
 
     readonly property real toastW: 320
     readonly property real toastH: 56

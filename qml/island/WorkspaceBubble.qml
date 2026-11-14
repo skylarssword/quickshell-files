@@ -88,7 +88,7 @@ Item {
             ? Qt.rgba(0, 0, 0, 1.0)
             : (root.useWalColor
                 ? Qt.rgba(root.walColor.r, root.walColor.g, root.walColor.b, root.capsuleOpacityValue)
-                : Qt.rgba(0, 0, 0, root.capsuleOpacityValue))
+                : Glass.bodyFill(root.capsuleOpacityValue))
 
         Behavior on color { ColorAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeMove } }
         Behavior on width { NumberAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeArrive } }
@@ -209,7 +209,7 @@ Item {
             ? Qt.rgba(0, 0, 0, 1.0)
             : (root.useWalColor
                 ? Qt.rgba(root.walColor.r, root.walColor.g, root.walColor.b, root.capsuleOpacityValue)
-                : Qt.rgba(0, 0, 0, root.capsuleOpacityValue))
+                : Glass.bodyFill(root.capsuleOpacityValue))
 
         Behavior on color { ColorAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeMove } }
 

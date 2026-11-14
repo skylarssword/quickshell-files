@@ -541,6 +541,7 @@ MouseArea {
                     color: Qt.rgba(1, 1, 1, 0.08)
 
                     TextInput {
+                        renderType: TextInput.NativeRendering
                         id: cityInput
                         anchors.fill: parent
                         anchors.leftMargin: 8
@@ -1040,6 +1041,7 @@ onAccepted: {
  text: "󰍉"; color: "white"; opacity: 0.78; font.pixelSize: 12
                                        anchors.verticalCenter: parent.verticalCenter }
                                 TextInput {
+                                    renderType: TextInput.NativeRendering
                                     id: clipSearchInput
                                     width: parent.width - 40; height: parent.height
                                     color: "white"; font.pixelSize: 11; font.family: root.textFontFamily
@@ -1352,6 +1354,7 @@ onAccepted: {
  text: "󰐕"; color: "white"; opacity: 0.78; font.pixelSize: 14
                                anchors.verticalCenter: parent.verticalCenter }
                        TextInput {
+                            renderType: TextInput.NativeRendering
                             id: todoAddInput
                             width: parent.width - 40; height: parent.height
                             color: "white"; font.pixelSize: 12; font.family: root.textFontFamily

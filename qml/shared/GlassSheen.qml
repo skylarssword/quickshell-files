@@ -75,13 +75,13 @@ Item {
         }
     }
 
-    // dark tint, a little deeper toward the bottom (light comes from above)
+    // wallpaper-colored tint, a little deeper toward the bottom (light comes from above)
     Rectangle {
         anchors.fill: parent
         radius: sheen.cr
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, Glass.tintAlpha * 0.4) }
-            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, Glass.tintAlpha * 1.4) }
+            GradientStop { position: 0.0; color: Qt.rgba(Glass.tintColor.r, Glass.tintColor.g, Glass.tintColor.b, Math.min(1, Glass.tintAlpha * Glass.tintBoost * 0.4)) }
+            GradientStop { position: 1.0; color: Qt.rgba(Glass.tintColor.r, Glass.tintColor.g, Glass.tintColor.b, Math.min(1, Glass.tintAlpha * Glass.tintBoost * 1.4)) }
         }
     }
 

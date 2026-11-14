@@ -52,7 +52,7 @@ PanelWindow {
         ? Qt.rgba(0, 0, 0, 1.0)
         : (root.capsuleUseWalColor
             ? Qt.rgba(root.capsuleWalColor.r, root.capsuleWalColor.g, root.capsuleWalColor.b, root.capsuleOpacity * (Glass.enabled ? Glass.bodyScale : 1.0))
-            : Qt.rgba(0, 0, 0, root.capsuleOpacity * (Glass.enabled ? Glass.bodyScale : 1.0)))
+            : Glass.bodyFill(root.capsuleOpacity * (Glass.enabled ? Glass.bodyScale : 1.0)))
 
     property bool anyWindowOpen: false
     property bool activeWindowFullscreen: false

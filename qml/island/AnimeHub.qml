@@ -637,6 +637,7 @@ Item {
                 }
 
                 TextInput {
+                    renderType: TextInput.NativeRendering
                     id: searchInput
                     width: parent.width - 60
                     height: 30

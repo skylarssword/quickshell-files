@@ -42,7 +42,7 @@ PanelWindow {
         ? Qt.rgba(0, 0, 0, 1.0)
         : (capsuleUseWalColor
             ? Qt.rgba(capsuleWalColor.r, capsuleWalColor.g, capsuleWalColor.b, capsuleOpacityValue * glassBodyScale)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
+            : Glass.bodyFill(capsuleOpacityValue * glassBodyScale))
 
     readonly property var hyprMonitor: screen
         ? Hyprland.monitorFor(screen) : Hyprland.focusedMonitor
@@ -807,7 +807,9 @@ PanelWindow {
                     if (musicPopup.popupOpen) {
                         appLauncher.close(); screenshotGallery.close()
                         infoPopup.close()
+                        notifCenter.close()
                         controlCenter.close()
+                        powerMenu.close()
                     }
                 }
             }

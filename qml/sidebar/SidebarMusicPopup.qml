@@ -33,7 +33,7 @@ PanelWindow {
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
             ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
+            : Glass.bodyFill(capsuleOpacityValue * glassBodyScale))
 
     readonly property bool isPlaying: activePlayer !== null
         && activePlayer.playbackState === MprisPlaybackState.Playing
@@ -350,6 +350,7 @@ PanelWindow {
                             Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
 
                             Text {
+                                renderType: Text.NativeRendering
                                 anchors.centerIn: parent
                                 text: "›"
                                 color: "white"
@@ -674,6 +675,7 @@ PanelWindow {
                 z: 2
 
                 Text {
+                    renderType: Text.NativeRendering
                     anchors.centerIn: parent
                     text: "‹"
                     color: "white"

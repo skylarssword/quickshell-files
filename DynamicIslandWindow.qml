@@ -2694,6 +2694,7 @@ SearchPillLayer {
                             spacing: 8
 
                             Text {
+                                renderType: Text.NativeRendering
                                 text: "\uf030"
                                 font.family: root.iconFontFamily
                                 font.pixelSize: 13
@@ -2703,6 +2704,7 @@ SearchPillLayer {
                             }
 
                             Text {
+                                renderType: Text.NativeRendering
                                 id: capturingLabel
                                 text: "Capturing…"
                                 color: "white"
@@ -3050,6 +3052,7 @@ readonly property int bubbleSize: 26
             }
 
             Text {
+                renderType: Text.NativeRendering
                 anchors.centerIn: parent
                 text: "\uf1f6"
                 font.family: root.iconFontFamily

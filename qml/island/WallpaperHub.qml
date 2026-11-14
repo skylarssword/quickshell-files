@@ -393,6 +393,7 @@ Item {
                     }
 
                     TextInput {
+                        renderType: TextInput.NativeRendering
                         id: searchInput
                         width: searchPill.width - 56
                         height: 30

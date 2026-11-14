@@ -101,7 +101,7 @@ Rectangle {
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
             ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue))
+            : Glass.bodyFill(capsuleOpacityValue))
 
     Behavior on color { ColorAnimation { duration: IslandMotion.fast; easing.type: IslandMotion.easeMove } }
 

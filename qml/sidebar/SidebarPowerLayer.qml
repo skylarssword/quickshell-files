@@ -23,7 +23,7 @@ PanelWindow {
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
             ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
+            : Glass.bodyFill(capsuleOpacityValue * glassBodyScale))
 
     property bool popupOpen: false
     function open()  { popupOpen = true  }

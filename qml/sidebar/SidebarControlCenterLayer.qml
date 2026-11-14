@@ -24,7 +24,7 @@ PanelWindow {
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
             ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
+            : Glass.bodyFill(capsuleOpacityValue * glassBodyScale))
 
     readonly property color moduleColor:  Qt.rgba(1,1,1, gamemodeActive ? 0.03 : 0.05)
     readonly property color moduleHover:  Qt.rgba(1,1,1, gamemodeActive ? 0.06 : 0.09)

@@ -354,6 +354,7 @@ Item {
                             }
 
                             TextInput {
+                                renderType: TextInput.NativeRendering
                                 id: bluetoothSecretField
                                 anchors.left: parent.left
                                 anchors.right: parent.right
@@ -506,6 +507,7 @@ Item {
                         }
 
                         TextInput {
+                            renderType: TextInput.NativeRendering
                             id: wifiPasswordField
                             anchors.left: parent.left
                             anchors.right: parent.right

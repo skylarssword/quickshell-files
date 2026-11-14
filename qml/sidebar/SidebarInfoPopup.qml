@@ -24,7 +24,7 @@ PanelWindow {
         ? Qt.rgba(0, 0, 0, 1.0)
         : (useWalColor
             ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
-            : Qt.rgba(0, 0, 0, capsuleOpacityValue * glassBodyScale))
+            : Glass.bodyFill(capsuleOpacityValue * glassBodyScale))
 
     property bool popupOpen: false
     function open()  { popupOpen = true;  if (!_loaded) { _loaded = true; loadCity("") } }
@@ -279,6 +279,7 @@ PanelWindow {
                         width: parent.width; height: 22; radius: 11
                         color: Qt.rgba(1,1,1,0.08)
                         TextInput {
+                            renderType: TextInput.NativeRendering
                             id: cityInput
                             anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
                             color: "white"; font.pixelSize: 11; font.family: root.textFontFamily

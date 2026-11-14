@@ -907,6 +907,7 @@ PanelWindow {
             }
 
             Text {
+                renderType: Text.NativeRendering
                 anchors {
                     left: parent.left; right: parent.right
                     top: root.gridMode ? searchBar.bottom : parent.top

@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import Quickshell
 import Quickshell.Io
 
 // Central Liquid Glass switch + tuning for tide-island.
@@ -35,6 +36,65 @@ QtObject {
     readonly property real bodyRimAlpha:    0.18
     readonly property real bodyGlowAlpha:   0.06
     readonly property real bodyGlintAlpha:  0.55
+
+    // ── wallpaper tint (replaces the old black tint) ────────────────────
+    // tintIndex 0..15 pins the tint to that exact pywal color (used as-is, no re-lighting).
+    // tintIndex -1 auto-picks the most vivid of color1..color6 and re-lights it to a fixed dark lightness.
+    readonly property int  tintIndex:           8     // pywal color number to use, or -1 for auto
+    readonly property real tintMinVividness:   0.15   // auto mode only: below this a color counts as gray; if none passes, tintFallback is used
+    readonly property real tintSaturationFloor: 0.60  // the picked hue is pushed to at least this saturation (0..1)
+    readonly property real tintLightness:       0.30  // HSL lightness of the tint: lower = darker, more readable
+    readonly property real tintBoost:           1.0   // multiplies the tint alpha; 1.0 = same strength as the old black tint, raise for a stronger color
+    readonly property color tintFallback:       "#2b2470"   // deep indigo, used when pywal is missing or the wallpaper is gray
+
+    property color tintColor: tintFallback
+    Behavior on tintColor { ColorAnimation { duration: 450; easing.type: Easing.OutCubic } }
+
+    function _pickTint(lines) {
+        if (tintIndex >= 0 && tintIndex < lines.length) {
+            const pinned = lines[tintIndex].trim()
+            if (/^#?[0-9A-Fa-f]{6}$/.test(pinned)) {
+                tintColor = Qt.color(pinned.startsWith("#") ? pinned : ("#" + pinned))
+                return
+            }
+        }
+        let best = null
+        let bestScore = tintMinVividness
+        // line 0 is color0 (background); colors 1..6 are the accent hues
+        for (let i = 1; i <= 6 && i < lines.length; i++) {
+            const raw = lines[i].trim()
+            if (!/^#?[0-9A-Fa-f]{6}$/.test(raw)) continue
+            const c = Qt.color(raw.startsWith("#") ? raw : ("#" + raw))
+            // saturation alone favours near-black/near-white colors; weight by how mid-tone it is
+            const score = c.hslSaturation * (1 - Math.abs(2 * c.hslLightness - 1))
+            if (score > bestScore) { best = c; bestScore = score }
+        }
+        tintColor = best
+            ? Qt.hsla(best.hslHue, Math.min(1, Math.max(best.hslSaturation, tintSaturationFloor)), tintLightness, 1)
+            : tintFallback
+    }
+
+    // Body-fill color for glass surfaces: the wallpaper tint when glass is on, plain black when off.
+    // `alpha` is the surface's own fill alpha (already scaled by Glass.bodyScale where that applies).
+    function bodyFill(alpha) {
+        return enabled
+            ? Qt.rgba(tintColor.r, tintColor.g, tintColor.b, Math.min(1, alpha * tintBoost))
+            : Qt.rgba(0, 0, 0, alpha)
+    }
+
+    property FileView _walFile: FileView {
+        path: Quickshell.env("HOME") + "/.cache/wal/colors"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: glass._walTimer.restart()
+        onLoaded: glass._pickTint(text().trim().split("\n"))
+    }
+
+    property Timer _walTimer: Timer {
+        interval: 80
+        repeat: false
+        onTriggered: glass._walFile.reload()
+    }
 
     property Process _read: Process {
         running: true

@@ -57,6 +57,24 @@ Item {
         }
     }
 
+    // cards that can't draw outside themselves (clipped drawers/lists) get the same dark
+    // edge drawn just INSIDE the card instead, so they keep their definition
+    Repeater {
+        model: sheen.outerEdge ? 0 : 2
+        Rectangle {
+            required property int index
+            readonly property int k: index + 1
+            x: k
+            y: k
+            width: sheen.width - 2 * k
+            height: sheen.height - 2 * k
+            radius: Math.max(0, sheen.cr - k)
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(0, 0, 0, k === 1 ? Glass.edgeAlpha : Glass.shadowAlpha)
+        }
+    }
+
     // dark tint, a little deeper toward the bottom (light comes from above)
     Rectangle {
         anchors.fill: parent
