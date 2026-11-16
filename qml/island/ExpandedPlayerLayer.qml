@@ -84,7 +84,7 @@ Item {
     }
 
     anchors.fill: parent
-    anchors.margins: 20
+    anchors.margins: 16
     opacity: showCondition ? 1 : 0
 
     Behavior on opacity {
@@ -107,285 +107,189 @@ Item {
         }
     }
 
-Column {
+    // Main strip:  [disc] [title / artist / scrub bar]   [shuffle prev play next loop] [time] | [cava]
+    //                                                      "Playing in <player> (Workspace N)"
+    Item {
+        id: playerRow
         anchors.fill: parent
-        spacing: 14
 
+        // ── round spinning disc ─────────────────────────────────────────────
         Item {
-            width: parent.width
-            height: 7
+            id: disc
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(parent.height, 124)
+            height: width
 
-            Text {
-                renderType: Text.NativeRendering
-                anchors.centerIn: parent
-                visible: root.mediaWorkspaceId >= 1 && root.activePlayer !== null
-                text: {
-                    const id = root.activePlayer ? String(root.activePlayer.identity || "").toLowerCase() : ""
-                    const name = (id.indexOf("ytm") >= 0 || id.indexOf("youtube") >= 0)
-                        ? "YouTube Music"
-                        : (root.activePlayer ? (root.activePlayer.identity || "Music") : "Music")
-                    return "Playing in " + name + " (Workspace " + root.mediaWorkspaceId + ")"
-                }
-                color: "#FFFFFF"
-                font.pixelSize: 12
-                font.weight: Font.Bold
-                font.family: textFontFamily
-                font.letterSpacing: 0.2
-            }
-        }
-
-        Item {
-            width: parent.width
-            height: 60
-
-            Row {
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 10
-
-                Item {
-                    width: 75
-                    height: 75
-
-                    Image {
-                        id: expandedArtImage
-                        anchors.fill: parent
-                        source: currentArtUrl
-                        fillMode: Image.PreserveAspectCrop
-                        sourceSize: Qt.size(200, 200)
-                        smooth: true
-                        mipmap: true
-                        visible: false
-                    }
-
-                    Rectangle {
-                        id: expandedArtMask
-                        anchors.fill: parent
-                        radius: width / 2
-                        visible: false
-                    }
-
-                    Item {
-                        id: artSpinner
-                        anchors.fill: parent
-
-                        property real angle: 0
-
-                        RotationAnimation on angle {
-                            id: spinAnim
-                            from: 0
-                            to: 360
-                            duration: 8000
-                            direction: RotationAnimation.Clockwise
-                            loops: Animation.Infinite
-                            running: isPlaying && currentArtUrl !== ""
-                            paused: !isPlaying
-                        }
-
-                        Behavior on angle {
-                            enabled: false
-                        }
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: width / 2
-                            color: Qt.rgba(1, 1, 1, 0.06)
-                            visible: currentArtUrl === ""
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            visible: currentArtUrl === ""
-                            text: "\uf001"
-                            font.family: iconFontFamily
-                            font.pixelSize: 26
-                            color: "white"
-                            opacity: 0.4
-                            renderType: Text.NativeRendering
-                        }
-
-                        OpacityMask {
-                            anchors.fill: parent
-                            rotation: artSpinner.angle
-                            source: expandedArtImage
-                            maskSource: expandedArtMask
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: "transparent"
-                        border.width: IslandMotion.surfaceBorderWidth
-                        border.color: IslandMotion.surfaceBorderColor
-                    }
-                }
-
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
-
-                    Text {
-                        renderType: Text.NativeRendering
-                        text: currentTrack
-                        color: "white"
-                        font.pixelSize: 16
-                        font.family: textFontFamily
-                        font.weight: Font.DemiBold
-                        font.letterSpacing: -0.15
-                        width: 180
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        renderType: Text.NativeRendering
-                        text: currentArtist
-                        color: IslandMotion.textSecondary
-                        font.pixelSize: 14
-                        font.family: textFontFamily
-                        font.weight: Font.Medium
-                        width: 200
-                        elide: Text.ElideRight
-                    }
-                }
-
-                MouseArea {
-                    width: 200
-                    height: 60
-                    anchors.verticalCenter: parent.verticalCenter
-                    preventStealing: true
-                    onPressed: (mouse) => { mouse.accepted = true }
-                    onClicked: (mouse) => {
-                        mouse.accepted = true
-                        if (activePlayer && activePlayer.canRaise) activePlayer.raise()
-                    }
-                }
-            }
-
-            Item {
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                width: 44
-                height: 36
-
-                Row {
-                    anchors.centerIn: parent
-                    height: parent.height
-                    spacing: 4
-
-                    Repeater {
-                        model: 6
-                        delegate: Rectangle {
-                            width: 4
-                            smooth: true
-                            antialiasing: true
-                            readonly property real level: root.visualizerLevel(index)
-                            height: isPlaying
-                                ? 2 + (parent.height - 2) * level
-                                : 2 + (parent.height - 2) * pausedVisualizerLevel(index)
-                            radius: 2
-                            color: isPlaying ? cavaActiveColor : cavaPausedColor
-                            anchors.verticalCenter: parent.verticalCenter
-                            Behavior on height { NumberAnimation { duration: isPlaying ? 50 : 260; easing.type: Easing.InOutQuad } }
-                            Behavior on color { ColorAnimation { duration: isPlaying ? 140 : 280; easing.type: Easing.InOutQuad } }
-                        }
-                    }
-                }
-            }
-        }
-
-        Item {
-            width: parent.width
-            height: 16
-
-            Text {
-                renderType: Text.NativeRendering
-                id: timeL
-                anchors.left: parent.left
-                text: timePlayed
-                color: IslandMotion.textSecondary
-                font.pixelSize: 12
-                font.family: textFontFamily
-                font.weight: Font.Medium
+            Image {
+                id: expandedArtImage
+                anchors.fill: parent
+                source: currentArtUrl
+                fillMode: Image.PreserveAspectCrop
+                sourceSize: Qt.size(300, 300)
+                smooth: true
+                mipmap: true
+                visible: false
             }
 
             Rectangle {
-                id: progressBar
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: timeL.right
-                anchors.right: timeR.left
-                anchors.margins: 12
-                height: 6
-                radius: 3
-                color: "#333333"
+                id: expandedArtMask
+                anchors.fill: parent
+                radius: width / 2
+                visible: false
+            }
 
-Rectangle {
-                    height: parent.height
-                    radius: 3
-                    color: "white"
-                    width: parent.width * Math.max(0, Math.min(1, trackProgress))
-                    Behavior on width {
-                        enabled: !scrubArea.pressed && !root._justShown
-                        NumberAnimation { duration: 500; easing.type: Easing.OutCubic }
-                    }
+            Item {
+                id: artSpinner
+                anchors.fill: parent
+
+                property real angle: 0
+                opacity: isPlaying ? 1.0 : 0.45
+                Behavior on opacity { NumberAnimation { duration: 280; easing.type: Easing.InOutQuad } }
+
+                RotationAnimation on angle {
+                    id: spinAnim
+                    from: 0
+                    to: 360
+                    duration: 8000
+                    direction: RotationAnimation.Clockwise
+                    loops: Animation.Infinite
+                    running: isPlaying && currentArtUrl !== ""
+                    paused: !isPlaying
                 }
 
-                MouseArea {
-                    id: scrubArea
+                Behavior on angle {
+                    enabled: false
+                }
+
+                Rectangle {
                     anchors.fill: parent
-                    anchors.margins: -10
-                    preventStealing: true
-                    onPressed: (mouse) => { mouse.accepted = true; controlPressed() }
-                    onClicked: (mouse) => { mouse.accepted = true }
-                    onPositionChanged: (mouse) => {
-                        if (!pressed) return
-                        if (!activePlayer || !activePlayer.canSeek) return
-                        const fraction = Math.max(0, Math.min(1, mouse.x / width))
-                        const length = Number(activePlayer.length) || 0
-                        if (length > 0) activePlayer.position = fraction * length
-                    }
-                    onReleased: (mouse) => {
-                        if (!activePlayer || !activePlayer.canSeek) return
-                        const fraction = Math.max(0, Math.min(1, mouse.x / width))
-                        const length = Number(activePlayer.length) || 0
-                        if (length > 0) activePlayer.position = fraction * length
-                    }
+                    radius: width / 2
+                    color: Qt.rgba(1, 1, 1, 0.06)
+                    visible: currentArtUrl === ""
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    visible: currentArtUrl === ""
+                    text: ""
+                    font.family: iconFontFamily
+                    font.pixelSize: 34
+                    color: "white"
+                    opacity: 0.4
+                    renderType: Text.NativeRendering
+                }
+
+                OpacityMask {
+                    anchors.fill: parent
+                    rotation: artSpinner.angle
+                    source: expandedArtImage
+                    maskSource: expandedArtMask
                 }
             }
 
-            Text {
-                renderType: Text.NativeRendering
-                id: timeR
-                anchors.right: parent.right
-                text: timeTotal
-                color: IslandMotion.textSecondary
-                font.pixelSize: 12
-                font.family: textFontFamily
-                font.weight: Font.Medium
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: "transparent"
+                border.width: IslandMotion.surfaceBorderWidth
+                border.color: IslandMotion.surfaceBorderColor
             }
         }
 
+        // ── cava bars, far right ─────────────────────────────────────────────
         Item {
-            width: parent.width
-            height: 36
+            id: cavaBox
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: 44
+            height: 44
 
             Row {
                 anchors.centerIn: parent
-                spacing: 28
+                height: parent.height
+                spacing: 4
 
+                Repeater {
+                    model: 6
+                    delegate: Rectangle {
+                        width: 4
+                        smooth: true
+                        antialiasing: true
+                        readonly property real level: root.visualizerLevel(index)
+                        height: isPlaying
+                            ? 2 + (parent.height - 2) * level
+                            : 2 + (parent.height - 2) * pausedVisualizerLevel(index)
+                        radius: 2
+                        color: isPlaying ? cavaActiveColor : cavaPausedColor
+                        anchors.verticalCenter: parent.verticalCenter
+                        Behavior on height { NumberAnimation { duration: isPlaying ? 50 : 260; easing.type: Easing.InOutQuad } }
+                        Behavior on color { ColorAnimation { duration: isPlaying ? 140 : 280; easing.type: Easing.InOutQuad } }
+                    }
+                }
+            }
+        }
+
+        // ── divider before the cava ──────────────────────────────────────────
+        Rectangle {
+            id: divider
+            anchors.right: cavaBox.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1
+            height: 44
+            color: IslandMotion.surfaceBorderColor
+        }
+
+        // ── divider between title block and playback controls ────────────────
+        Rectangle {
+            id: dividerLeft
+            anchors.right: controlsBlock.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1
+            height: 44
+            color: IslandMotion.surfaceBorderColor
+        }
+
+        // ── transport controls with the "Playing in…" line underneath ─────────
+        Item {
+            id: controlsBlock
+            anchors.right: divider.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(topRow.width, statusText.visible ? statusText.implicitWidth : 0)
+            height: topRow.height + (statusText.visible ? statusText.height + 8 : 0)
+
+            // [shuffle prev play next loop]  elapsed / total
+            Row {
+              id: topRow
+              anchors.top: parent.top
+              anchors.horizontalCenter: parent.horizontalCenter
+              height: 36
+              spacing: 14
+
+            Row {
+                id: transportRow
+                anchors.verticalCenter: parent.verticalCenter
+                height: 36
+                spacing: 10
+
+                // shuffle
                 Item {
-                    width: 24
-                    height: 24
-                    opacity: activePlayer && activePlayer.shuffle ? 1.0 : 0.35
-                    scale: shuffleArea.pressed ? 0.8 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 100 } }
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 26
+                    height: 26
+                    opacity: shuffleArea.pressed ? 0.6 : (activePlayer && activePlayer.shuffle ? 1.0 : 0.35)
                     Behavior on opacity { NumberAnimation { duration: 150 } }
                     Canvas {
                         anchors.fill: parent
                         property color fillColor: "white"
                         onPaint: {
                             var ctx = getContext("2d")
+                            ctx.setTransform(1, 0, 0, 1, 0, 0)
                             ctx.clearRect(0, 0, width, height)
+                            ctx.setTransform(width / 24, 0, 0, height / 24, 0, 0)
                             ctx.strokeStyle = fillColor
                             ctx.lineWidth = 2
                             ctx.lineCap = "round"
@@ -407,7 +311,7 @@ Rectangle {
                     MouseArea {
                         id: shuffleArea
                         anchors.fill: parent
-                        anchors.margins: -12
+                        anchors.margins: -5
                         preventStealing: true
                         onPressed: (mouse) => { controlPressed(); mouse.accepted = true }
                         onClicked: {
@@ -427,18 +331,20 @@ Rectangle {
                     }
                 }
 
+                // previous
                 Item {
-                    width: 28
-                    height: 28
-                    scale: prevArea.pressed ? 0.8 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 100 } }
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 32
+                    height: 32
                     Canvas {
                         anchors.fill: parent
                         property color fillColor: prevArea.pressed ? "#888" : "white"
                         onFillColorChanged: requestPaint()
                         onPaint: {
                             var ctx = getContext("2d")
+                            ctx.setTransform(1, 0, 0, 1, 0, 0)
                             ctx.clearRect(0, 0, width, height)
+                            ctx.setTransform(width / 28, 0, 0, height / 28, 0, 0)
                             ctx.fillStyle = fillColor
                             ctx.strokeStyle = fillColor
                             ctx.lineJoin = "round"
@@ -456,24 +362,24 @@ Rectangle {
                     MouseArea {
                         id: prevArea
                         anchors.fill: parent
-                        anchors.margins: -15
+                        anchors.margins: -5
                         preventStealing: true
                         onPressed: (mouse) => { controlPressed(); mouse.accepted = true }
                         onClicked: if (activePlayer) activePlayer.previous()
                     }
                 }
 
+                // play / pause
                 Item {
-                    width: 28
-                    height: 28
-                    scale: playArea.pressed ? 0.8 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 100 } }
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 34
+                    height: 34
                     Row {
                         anchors.centerIn: parent
-                        spacing: 6
+                        spacing: 7
                         visible: activePlayer && activePlayer.playbackState === MprisPlaybackState.Playing
-                        Rectangle { width: 6; height: 20; radius: 2; color: playArea.pressed ? "#888" : "white" }
-                        Rectangle { width: 6; height: 20; radius: 2; color: playArea.pressed ? "#888" : "white" }
+                        Rectangle { width: 7; height: 23; radius: 3; color: playArea.pressed ? "#888" : "white" }
+                        Rectangle { width: 7; height: 23; radius: 3; color: playArea.pressed ? "#888" : "white" }
                     }
                     Canvas {
                         anchors.fill: parent
@@ -482,7 +388,9 @@ Rectangle {
                         onFillColorChanged: requestPaint()
                         onPaint: {
                             var ctx = getContext("2d")
+                            ctx.setTransform(1, 0, 0, 1, 0, 0)
                             ctx.clearRect(0, 0, width, height)
+                            ctx.setTransform(width / 28, 0, 0, height / 28, 0, 0)
                             ctx.fillStyle = fillColor
                             ctx.strokeStyle = fillColor
                             ctx.lineJoin = "round"
@@ -497,25 +405,27 @@ Rectangle {
                     MouseArea {
                         id: playArea
                         anchors.fill: parent
-                        anchors.margins: -15
+                        anchors.margins: -5
                         preventStealing: true
                         onPressed: (mouse) => { controlPressed(); mouse.accepted = true }
                         onClicked: togglePlayback()
                     }
                 }
 
+                // next
                 Item {
-                    width: 28
-                    height: 28
-                    scale: nextArea.pressed ? 0.8 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 100 } }
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 32
+                    height: 32
                     Canvas {
                         anchors.fill: parent
                         property color fillColor: nextArea.pressed ? "#888" : "white"
                         onFillColorChanged: requestPaint()
                         onPaint: {
                             var ctx = getContext("2d")
+                            ctx.setTransform(1, 0, 0, 1, 0, 0)
                             ctx.clearRect(0, 0, width, height)
+                            ctx.setTransform(width / 28, 0, 0, height / 28, 0, 0)
                             ctx.fillStyle = fillColor
                             ctx.strokeStyle = fillColor
                             ctx.lineJoin = "round"
@@ -533,77 +443,279 @@ Rectangle {
                     MouseArea {
                         id: nextArea
                         anchors.fill: parent
-                        anchors.margins: -15
+                        anchors.margins: -5
                         preventStealing: true
                         onPressed: (mouse) => { controlPressed(); mouse.accepted = true }
                         onClicked: if (activePlayer) activePlayer.next()
                     }
                 }
 
-    Item {
-        width: 24
-        height: 24
-        opacity: activePlayer && activePlayer.loopState !== MprisLoopState.None ? 1.0 : 0.35
-        scale: loopArea.pressed ? 0.8 : 1.0
-        Behavior on scale { NumberAnimation { duration: 100 } }
-        Behavior on opacity { NumberAnimation { duration: 150 } }
-        Canvas {
-            anchors.fill: parent
-            property color fillColor: "white"
-            property bool loopOne: activePlayer && activePlayer.loopState === MprisLoopState.Track
-            onLoopOneChanged: requestPaint()
-            onPaint: {
-                var ctx = getContext("2d")
-                ctx.clearRect(0, 0, width, height)
-                ctx.strokeStyle = fillColor
-                ctx.lineWidth = 2
-                ctx.lineCap = "round"
-                ctx.lineJoin = "round"
-                ctx.beginPath()
-                ctx.moveTo(4, 10); ctx.lineTo(4, 17); ctx.lineTo(18, 17)
-                ctx.stroke()
-                ctx.beginPath()
-                ctx.moveTo(20, 14); ctx.lineTo(18, 17); ctx.lineTo(20, 20)
-                ctx.stroke()
-                ctx.beginPath()
-                ctx.moveTo(20, 14); ctx.lineTo(20, 7); ctx.lineTo(6, 7)
-                ctx.stroke()
-                ctx.beginPath()
-                ctx.moveTo(4, 10); ctx.lineTo(6, 7); ctx.lineTo(4, 4)
-                ctx.stroke()
-                if (loopOne) {
-                    ctx.font = "bold 8px sans-serif"
-                    ctx.fillStyle = fillColor
-                    ctx.textAlign = "center"
-                    ctx.fillText("1", 12, 15)
+                // loop (off / playlist / single track)
+                Item {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 26
+                    height: 26
+                    opacity: loopArea.pressed ? 0.6 : (activePlayer && activePlayer.loopState !== MprisLoopState.None ? 1.0 : 0.35)
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                    Canvas {
+                        anchors.fill: parent
+                        property color fillColor: "white"
+                        property bool loopOne: activePlayer && activePlayer.loopState === MprisLoopState.Track
+                        onLoopOneChanged: requestPaint()
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.setTransform(1, 0, 0, 1, 0, 0)
+                            ctx.clearRect(0, 0, width, height)
+                            ctx.setTransform(width / 24, 0, 0, height / 24, 0, 0)
+                            ctx.strokeStyle = fillColor
+                            ctx.lineWidth = 2
+                            ctx.lineCap = "round"
+                            ctx.lineJoin = "round"
+                            ctx.beginPath()
+                            ctx.moveTo(4, 10); ctx.lineTo(4, 17); ctx.lineTo(18, 17)
+                            ctx.stroke()
+                            ctx.beginPath()
+                            ctx.moveTo(20, 14); ctx.lineTo(18, 17); ctx.lineTo(20, 20)
+                            ctx.stroke()
+                            ctx.beginPath()
+                            ctx.moveTo(20, 14); ctx.lineTo(20, 7); ctx.lineTo(6, 7)
+                            ctx.stroke()
+                            ctx.beginPath()
+                            ctx.moveTo(4, 10); ctx.lineTo(6, 7); ctx.lineTo(4, 4)
+                            ctx.stroke()
+                            if (loopOne) {
+                                ctx.font = "bold 8px sans-serif"
+                                ctx.fillStyle = fillColor
+                                ctx.textAlign = "center"
+                                ctx.fillText("1", 12, 15)
+                            }
+                        }
+                    }
+                    MouseArea {
+                        id: loopArea
+                        anchors.fill: parent
+                        anchors.margins: -5
+                        preventStealing: true
+                        onPressed: (mouse) => { controlPressed(); mouse.accepted = true }
+                        onClicked: {
+                            if (!activePlayer) return
+                            const s = activePlayer.loopState
+                            let next
+                            if (s === MprisLoopState.None) next = MprisLoopState.Playlist
+                            else if (s === MprisLoopState.Playlist) next = MprisLoopState.Track
+                            else next = MprisLoopState.None
+
+                            activePlayer.loopState = next
+                        }
+                    }
+                }
+            }
+
+                Text {
+                    id: timeText
+                    renderType: Text.NativeRendering
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(72, implicitWidth)
+                    horizontalAlignment: Text.AlignHCenter
+                    text: timePlayed + " / " + timeTotal
+                    color: IslandMotion.textSecondary
+                    font.pixelSize: 14
+                    font.family: textFontFamily
+                    font.weight: Font.Medium
+                }
+            }
+
+            // "Playing in <player> (Workspace N)", centred in the controls section
+            Text {
+                id: statusText
+                renderType: Text.NativeRendering
+                anchors.top: topRow.bottom
+                anchors.topMargin: 8
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: implicitWidth
+                horizontalAlignment: Text.AlignHCenter
+                visible: root.mediaWorkspaceId >= 1 && root.activePlayer !== null
+                text: {
+                    const id = root.activePlayer ? String(root.activePlayer.identity || "").toLowerCase() : ""
+                    const name = (id.indexOf("ytm") >= 0 || id.indexOf("youtube") >= 0)
+                        ? "YouTube Music"
+                        : (root.activePlayer ? (root.activePlayer.identity || "Music") : "Music")
+                    return "Playing in " + name + " (Workspace " + root.mediaWorkspaceId + ")"
+                }
+                color: "#FFFFFF"
+                font.pixelSize: 11
+                font.weight: Font.Bold
+                font.family: textFontFamily
+                font.letterSpacing: 0.1
+            }
+        }
+
+        // ── title / artist / scrub bar ───────────────────────────────────────
+        Item {
+            id: infoBlock
+            anchors.left: disc.right
+            anchors.leftMargin: 14
+            anchors.right: dividerLeft.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            height: infoColumn.height
+
+            Column {
+                id: infoColumn
+                width: parent.width
+                spacing: 10
+
+                Item {
+                    id: nameBlock
+                    width: parent.width
+                    height: titleClip.height + artistClip.height + 3
+
+                    // long titles scroll to reveal the end, pause, then slide back
+                    Item {
+                        id: titleClip
+                        width: parent.width
+                        height: titleText.height
+                        clip: true
+
+                        Text {
+                            id: titleText
+                            renderType: Text.NativeRendering
+                            x: 0
+                            readonly property real overflow: Math.max(0, implicitWidth - titleClip.width)
+                            text: currentTrack
+                            color: "white"
+                            font.pixelSize: 19
+                            font.family: textFontFamily
+                            font.weight: Font.DemiBold
+                            font.letterSpacing: -0.2
+                            onTextChanged: { x = 0; if (titleMarquee.running) titleMarquee.restart() }
+                        }
+
+                        SequentialAnimation {
+                            id: titleMarquee
+                            running: titleText.overflow > 0 && root.showCondition
+                            loops: Animation.Infinite
+                            onRunningChanged: if (!running) titleText.x = 0
+                            PauseAnimation { duration: 2500 }
+                            NumberAnimation {
+                                target: titleText; property: "x"
+                                to: -titleText.overflow
+                                duration: Math.min(7000, Math.max(900, titleText.overflow * 16))
+                                easing.type: Easing.InOutSine
+                            }
+                            PauseAnimation { duration: 1500 }
+                            NumberAnimation {
+                                target: titleText; property: "x"
+                                to: 0
+                                duration: 500
+                                easing.type: Easing.InOutSine
+                            }
+                        }
+                    }
+
+                    Item {
+                        id: artistClip
+                        anchors.top: titleClip.bottom
+                        anchors.topMargin: 3
+                        width: parent.width
+                        height: artistText.height
+                        clip: true
+
+                        Text {
+                            id: artistText
+                            renderType: Text.NativeRendering
+                            x: 0
+                            readonly property real overflow: Math.max(0, implicitWidth - artistClip.width)
+                            text: currentArtist
+                            color: IslandMotion.textSecondary
+                            font.pixelSize: 14
+                            font.family: textFontFamily
+                            font.weight: Font.Medium
+                            onTextChanged: { x = 0; if (artistMarquee.running) artistMarquee.restart() }
+                        }
+
+                        SequentialAnimation {
+                            id: artistMarquee
+                            running: artistText.overflow > 0 && root.showCondition
+                            loops: Animation.Infinite
+                            onRunningChanged: if (!running) artistText.x = 0
+                            PauseAnimation { duration: 2500 }
+                            NumberAnimation {
+                                target: artistText; property: "x"
+                                to: -artistText.overflow
+                                duration: Math.min(7000, Math.max(900, artistText.overflow * 16))
+                                easing.type: Easing.InOutSine
+                            }
+                            PauseAnimation { duration: 1500 }
+                            NumberAnimation {
+                                target: artistText; property: "x"
+                                to: 0
+                                duration: 500
+                                easing.type: Easing.InOutSine
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        preventStealing: true
+                        onPressed: (mouse) => { mouse.accepted = true }
+                        onClicked: (mouse) => {
+                            mouse.accepted = true
+                            if (activePlayer && activePlayer.canRaise) activePlayer.raise()
+                        }
+                    }
+                }
+
+                Item {
+                    width: parent.width
+                    height: 12
+
+                    Rectangle {
+                        id: progressBar
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width
+                        height: 6
+                        radius: 3
+                        color: "#333333"
+
+                        Rectangle {
+                            id: progressFill
+                            height: parent.height
+                            radius: 3
+                            color: "white"
+                            width: parent.width * Math.max(0, Math.min(1, trackProgress))
+                            Behavior on width {
+                                enabled: !scrubArea.pressed
+                                NumberAnimation { duration: 500; easing.type: Easing.OutCubic }
+                            }
+                        }
+                        MouseArea {
+                            id: scrubArea
+                            anchors.fill: parent
+                            anchors.margins: -12
+                            preventStealing: true
+                            onPressed: (mouse) => { mouse.accepted = true; controlPressed() }
+                            onClicked: (mouse) => { mouse.accepted = true }
+                            onPositionChanged: (mouse) => {
+                                if (!pressed) return
+                                if (!activePlayer || !activePlayer.canSeek) return
+                                const fraction = Math.max(0, Math.min(1, mouse.x / width))
+                                const length = Number(activePlayer.length) || 0
+                                if (length > 0) activePlayer.position = fraction * length
+                            }
+                            onReleased: (mouse) => {
+                                if (!activePlayer || !activePlayer.canSeek) return
+                                const fraction = Math.max(0, Math.min(1, mouse.x / width))
+                                const length = Number(activePlayer.length) || 0
+                                if (length > 0) activePlayer.position = fraction * length
+                            }
+                        }
+                    }
                 }
             }
         }
-        MouseArea {
-            id: loopArea
-            anchors.fill: parent
-            anchors.margins: -12
-            preventStealing: true
-            onPressed: (mouse) => { controlPressed(); mouse.accepted = true }
-            onClicked: {
-                if (!activePlayer) return
-                const s = activePlayer.loopState
-                let next
-                if (s === MprisLoopState.None) next = MprisLoopState.Playlist
-                else if (s === MprisLoopState.Playlist) next = MprisLoopState.Track
-                else next = MprisLoopState.None
-
-                console.log("Loop cycle —", activePlayer.dbusName,
-                    "current:", s, "requesting:", next)
-
-                activePlayer.loopState = next
-            }
-        }
-    } 
-
-        } 
-    } 
-} 
+    }
 
     Process { id: loopProc }
     Process { id: shuffleProc }

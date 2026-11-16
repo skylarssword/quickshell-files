@@ -1955,7 +1955,6 @@ case "capturing":
                 case "info":
                     return 600;
                 case "expanded":
-                    return 920;
                 case "bluetooth_expanded":
                     return 400;
                 case "equalizer":
@@ -1999,7 +1998,7 @@ case "lyrics_control_center": {
 case "info":
                     return (mainCapsule.infoActiveTab === 0 || mainCapsule.infoActiveTab === 1) ? 360 : 300;
 case "expanded":
-                    return 152;
+                    return 193;
                 case "bluetooth_expanded":
                     return 165;
                 case "equalizer":
@@ -2032,7 +2031,6 @@ case "capturing":
                     case "info":
                     return 34;
                 case "expanded":
-                    return 680;
                 case "bluetooth_expanded":
                     return 40;
                case "equalizer":
@@ -2064,9 +2062,7 @@ color: root.overviewContentVisible
         ? Qt.rgba(0, 0, 0, 1.0)
         : (root.capsuleUseWalColor
             ? Qt.rgba(root.capsuleWalColor.r, root.capsuleWalColor.g, root.capsuleWalColor.b, root.capsuleOpacity * mainCapsule.bodyAlphaScale)
-            : (mainCapsule.glassBody
-                ? Glass.bodyFill(root.capsuleOpacity * mainCapsule.bodyAlphaScale)
-                : Qt.rgba(0, 0, 0, root.capsuleOpacity * mainCapsule.bodyAlphaScale))))
+            : Qt.rgba(0, 0, 0, root.capsuleOpacity * mainCapsule.bodyAlphaScale)))
             y: 5
             anchors.horizontalCenter: parent.horizontalCenter
             clip: true
