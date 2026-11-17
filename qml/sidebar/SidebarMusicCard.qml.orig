@@ -86,23 +86,6 @@ Item {
         anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
         width: card.railWidth
 
-        // darker strip, rounded only on the card's left corners (clipped, so no double-dark overlap)
-        Item {
-            anchors.fill: parent
-            clip: true
-            Rectangle {
-                width: parent.width + card.cornerRadius
-                height: parent.height
-                radius: card.cornerRadius
-                color: Qt.rgba(0, 0, 0, 0.16)
-            }
-        }
-        Rectangle {
-            anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
-            width: 1
-            color: IslandMotion.surfaceBorderColor
-        }
-
         Column {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.horizontalCenterOffset: -0.5
@@ -130,7 +113,8 @@ Item {
                     // icons are drawn, so they don't depend on the icon font
                     Canvas {
                         anchors.centerIn: parent
-                        width: 28; height: 28
+                        width: 56; height: 56
+                        scale: 0.5; smooth: true
                         opacity: tabBtn.active ? 1.0 : 0.55
                         Behavior on opacity { NumberAnimation { duration: 140 } }
                         onPaint: {
@@ -194,14 +178,19 @@ Item {
                     anchors.centerIn: parent
                     width: 164; height: 164
 
-                    Image {
-                        id: artImg
+                    Item {
+                        id: artRot
                         anchors.fill: parent
-                        source: card.currentArtUrl
-                        fillMode: Image.PreserveAspectCrop
-                        sourceSize: Qt.size(300, 300)
-                        smooth: true; mipmap: true
                         visible: false
+                        Image {
+                            id: artImg
+                            anchors.fill: parent
+                            source: card.currentArtUrl
+                            fillMode: Image.PreserveAspectCrop
+                            sourceSize: Qt.size(512, 512)
+                            smooth: true; mipmap: true
+                            rotation: artSpinner.angle
+                        }
                     }
                     Rectangle { id: artMask; anchors.fill: parent; radius: width / 2; visible: false }
                     Item {
@@ -218,8 +207,7 @@ Item {
                         }
                         OpacityMask {
                             anchors.fill: parent
-                            rotation: artSpinner.angle
-                            source: artImg
+                            source: artRot
                             maskSource: artMask
                         }
                     }
@@ -240,7 +228,8 @@ Item {
                         visible: card.currentArtUrl === "" || artImg.status !== Image.Ready
                         Canvas {
                             anchors.centerIn: parent
-                            width: 52; height: 52
+                            width: 104; height: 104
+                            scale: 0.5; smooth: true
                             opacity: 0.5
                             onPaint: {
                                 const ctx = getContext("2d")
@@ -372,42 +361,31 @@ Item {
             // transport
             Item {
                 width: parent.width
-                height: 54
+                height: 34
             Row {
                 id: transport
                 anchors.centerIn: parent
-                spacing: 8
+                spacing: 28
 
-                component RoundBtn: Item {
+                component TBtn: Item {
                     id: rb
-                    property int  d: 40
                     property bool pressed: ma.pressed
                     property real iconOpacity: 1.0
-                    property bool primary: false
                     default property alias iconSlot: slot.data
                     signal activated()
-                    width: d; height: d
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: rb.pressed ? Qt.rgba(1, 1, 1, 0.26)
-                             : (rb.primary ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.08))
-                        border.width: 1
-                        border.color: rb.primary ? Qt.rgba(1, 1, 1, 0.34) : Qt.rgba(1, 1, 1, 0.16)
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                    }
+                    width: 30; height: 30
+                    anchors.verticalCenter: parent.verticalCenter
                     Item {
                         id: slot
-                        anchors.centerIn: parent
-                        width: 24; height: 24
-                        opacity: rb.iconOpacity
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                        anchors.fill: parent
+                        opacity: rb.pressed ? rb.iconOpacity * 0.55 : rb.iconOpacity
+                        Behavior on opacity { NumberAnimation { duration: 120 } }
                     }
-                    MouseArea { id: ma; anchors.fill: parent; preventStealing: true; onClicked: rb.activated() }
+                    MouseArea { id: ma; anchors.fill: parent; anchors.margins: -8; preventStealing: true; onClicked: rb.activated() }
                 }
 
                 // shuffle
-                RoundBtn {
+                TBtn {
                     iconOpacity: card.activePlayer && card.activePlayer.shuffle ? 1.0 : 0.4
                     onActivated: {
                         if (!card.activePlayer) return
@@ -419,7 +397,8 @@ Item {
                         shuffleProc.running = true
                     }
                     Canvas {
-                        anchors.fill: parent
+                        anchors.centerIn: parent
+                        width: 60; height: 60; scale: 0.5; smooth: true
                         onPaint: {
                             const ctx = getContext("2d")
                             ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, width, height)
@@ -434,10 +413,11 @@ Item {
                 }
 
                 // previous
-                RoundBtn {
+                TBtn {
                     onActivated: if (card.activePlayer) card.activePlayer.previous()
                     Canvas {
-                        anchors.fill: parent
+                        anchors.centerIn: parent
+                        width: 60; height: 60; scale: 0.5; smooth: true
                         onPaint: {
                             const ctx = getContext("2d")
                             ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, width, height)
@@ -451,9 +431,7 @@ Item {
                 }
 
                 // play / pause
-                RoundBtn {
-                    d: 48
-                    primary: true
+                TBtn {
                     onActivated: {
                         const p = card.activePlayer
                         if (!p || !p.canControl) return
@@ -462,13 +440,14 @@ Item {
                         else { if (p.canPlay) p.play() }
                     }
                     Row {
-                        anchors.centerIn: parent; spacing: 5
+                        anchors.centerIn: parent; spacing: 6
                         visible: card.isPlaying
-                        Rectangle { width: 6; height: 20; radius: 2; color: "white" }
-                        Rectangle { width: 6; height: 20; radius: 2; color: "white" }
+                        Rectangle { width: 7; height: 22; radius: 2; color: "white" }
+                        Rectangle { width: 7; height: 22; radius: 2; color: "white" }
                     }
                     Canvas {
-                        anchors.fill: parent
+                        anchors.centerIn: parent
+                        width: 60; height: 60; scale: 0.5; smooth: true
                         visible: !card.isPlaying
                         onPaint: {
                             const ctx = getContext("2d")
@@ -482,10 +461,11 @@ Item {
                 }
 
                 // next
-                RoundBtn {
+                TBtn {
                     onActivated: if (card.activePlayer) card.activePlayer.next()
                     Canvas {
-                        anchors.fill: parent
+                        anchors.centerIn: parent
+                        width: 60; height: 60; scale: 0.5; smooth: true
                         onPaint: {
                             const ctx = getContext("2d")
                             ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, width, height)
@@ -499,7 +479,7 @@ Item {
                 }
 
                 // loop
-                RoundBtn {
+                TBtn {
                     iconOpacity: card.activePlayer && card.activePlayer.loopState !== MprisLoopState.None ? 1.0 : 0.4
                     onActivated: {
                         if (!card.activePlayer) return
@@ -508,7 +488,8 @@ Item {
                             : (s === MprisLoopState.Playlist ? MprisLoopState.Track : MprisLoopState.None)
                     }
                     Canvas {
-                        anchors.fill: parent
+                        anchors.centerIn: parent
+                        width: 60; height: 60; scale: 0.5; smooth: true
                         property bool loopOne: card.activePlayer && card.activePlayer.loopState === MprisLoopState.Track
                         onLoopOneChanged: requestPaint()
                         onPaint: {

@@ -64,7 +64,7 @@ Item {
             onRunningChanged: if (!running) label.x = 0
             PauseAnimation { duration: 2500 }
             NumberAnimation { target: label; property: "x"; to: -mq.overflow
-                duration: Math.max(700, mq.overflow * 30); easing.type: Easing.InOutSine }
+                duration: Math.min(7000, Math.max(900, mq.overflow * 16)); easing.type: Easing.InOutSine }
             PauseAnimation { duration: 1500 }
             NumberAnimation { target: label; property: "x"; to: 0; duration: 500; easing.type: Easing.InOutSine }
         }

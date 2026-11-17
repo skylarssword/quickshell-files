@@ -31,6 +31,9 @@ PanelWindow {
     property int    _entryId: -1
     property bool   _visible: false
 
+    // emitted when the toast is clicked; the window opens the notification center
+    signal openRequested()
+
     function showToast(appName, summary) {
         _appName = appName
         _summary = summary !== "" ? summary : "New notification"
@@ -52,7 +55,7 @@ PanelWindow {
 
     Timer {
         id: autoHide
-        interval: 4000
+        interval: 6500
         repeat: false
         onTriggered: root.hide()
     }
@@ -164,7 +167,7 @@ PanelWindow {
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.hide()
+            onClicked: { root.hide(); root.openRequested() }
         }
     }
 }

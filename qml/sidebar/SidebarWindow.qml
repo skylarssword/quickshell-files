@@ -525,6 +525,12 @@ PanelWindow {
         walColor:            root.capsuleWalColor
         capsuleOpacityValue: root.capsuleOpacityValue
         gamemodeActive:      root.gamemodeActive
+        onOpenRequested: {
+            notifCenter.open()
+            root.unreadCount = 0
+            appLauncher.close(); screenshotGallery.close(); musicPopup.close()
+            infoPopup.close(); controlCenter.close(); powerMenu.close()
+        }
     }
 
     IslandClock { id: sidebarClock }

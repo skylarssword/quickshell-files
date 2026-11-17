@@ -942,6 +942,7 @@ readonly property bool capturingLayerVisible: !root.overviewVisible && islandSta
             if (!lyricsControlCenterLayerVisible && lyricsControlCenterLoader.item) {
                 lyricsControlCenterLoader.item.lrclibPanelOpen    = false
                 lyricsControlCenterLoader.item.localFilePanelOpen = false
+                lyricsControlCenterLoader.item.tab                = root.lyricsExpandedView ? 2 : 0
             }
         }
 
@@ -1944,8 +1945,9 @@ case "capturing":
                 case "search":
                     return searchLoader.item ? searchLoader.item.capsuleWidth : 500;
                 case "control_center":
-                case "lyrics_control_center":
                     return 420;
+                case "lyrics_control_center":
+                    return lyricsControlCenterLoader.item ? lyricsControlCenterLoader.item.preferredWidth : 640;
                 case "power_menu":
                     return 340;
                 case "screenshot_gallery":
@@ -1992,9 +1994,7 @@ case "power_menu":
                         : 92;
 case "lyrics_control_center": {
                     const lyricsItem = lyricsControlCenterLoader.item;
-                    if (lyricsItem && lyricsItem.expandedView && lyricsItem.viewerMode !== "none")
-                        return 64 + lyricsItem.expandedViewerHeight;
-                    return 150 + (lyricsItem ? lyricsItem.controlCenterExtraHeight : 0);
+                    return lyricsItem ? lyricsItem.preferredHeight : 340;
                 }
 case "info":
                     return (mainCapsule.infoActiveTab === 0 || mainCapsule.infoActiveTab === 1) ? 360 : 300;

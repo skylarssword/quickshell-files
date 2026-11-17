@@ -144,8 +144,6 @@ Item {
                 anchors.fill: parent
 
                 property real angle: 0
-                opacity: isPlaying ? 1.0 : 0.45
-                Behavior on opacity { NumberAnimation { duration: 280; easing.type: Easing.InOutQuad } }
 
                 RotationAnimation on angle {
                     id: spinAnim
@@ -188,12 +186,28 @@ Item {
                 }
             }
 
+            // darken when paused
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: "black"
+                opacity: isPlaying ? 0 : 0.40
+                Behavior on opacity { NumberAnimation { duration: 300 } }
+            }
+
+            // ring: pulses while playing, plain border when paused
             Rectangle {
                 anchors.fill: parent
                 radius: width / 2
                 color: "transparent"
-                border.width: IslandMotion.surfaceBorderWidth
-                border.color: IslandMotion.surfaceBorderColor
+                border.width: isPlaying ? 2 : IslandMotion.surfaceBorderWidth
+                border.color: isPlaying ? Qt.rgba(1, 1, 1, 0.55) : IslandMotion.surfaceBorderColor
+                SequentialAnimation on border.color {
+                    running: isPlaying && root.showCondition
+                    loops: Animation.Infinite
+                    ColorAnimation { to: Qt.rgba(1, 1, 1, 0.85); duration: 700; easing.type: Easing.InOutSine }
+                    ColorAnimation { to: Qt.rgba(1, 1, 1, 0.20); duration: 700; easing.type: Easing.InOutSine }
+                }
             }
         }
 
@@ -588,13 +602,24 @@ Item {
                             font.family: textFontFamily
                             font.weight: Font.DemiBold
                             font.letterSpacing: -0.2
-                            onTextChanged: { x = 0; if (titleMarquee.running) titleMarquee.restart() }
+                            function kick() {
+                                titleMarquee.stop(); x = 0
+                                if (overflow > 0 && root.showCondition) titleMarquee.start()
+                            }
+                            onTextChanged: kick()
+                            onOverflowChanged: kick()
+                            Component.onCompleted: kick()
+                            Connections {
+                                target: root
+                                function onShowConditionChanged() { titleText.kick() }
+                            }
                         }
 
                         SequentialAnimation {
                             id: titleMarquee
-                            running: titleText.overflow > 0 && root.showCondition
-                            loops: Animation.Infinite
+                            // plays ONCE (not forever): when the track changes, the title
+                            // overflows, or the player opens. Then it rests at the start.
+                            loops: 1
                             onRunningChanged: if (!running) titleText.x = 0
                             PauseAnimation { duration: 2500 }
                             NumberAnimation {
@@ -631,13 +656,24 @@ Item {
                             font.pixelSize: 14
                             font.family: textFontFamily
                             font.weight: Font.Medium
-                            onTextChanged: { x = 0; if (artistMarquee.running) artistMarquee.restart() }
+                            function kick() {
+                                artistMarquee.stop(); x = 0
+                                if (overflow > 0 && root.showCondition) artistMarquee.start()
+                            }
+                            onTextChanged: kick()
+                            onOverflowChanged: kick()
+                            Component.onCompleted: kick()
+                            Connections {
+                                target: root
+                                function onShowConditionChanged() { artistText.kick() }
+                            }
                         }
 
                         SequentialAnimation {
                             id: artistMarquee
-                            running: artistText.overflow > 0 && root.showCondition
-                            loops: Animation.Infinite
+                            // plays ONCE (not forever): when the track changes, the title
+                            // overflows, or the player opens. Then it rests at the start.
+                            loops: 1
                             onRunningChanged: if (!running) artistText.x = 0
                             PauseAnimation { duration: 2500 }
                             NumberAnimation {
@@ -675,9 +711,9 @@ Item {
                         id: progressBar
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width
-                        height: 6
+                        height: 5
                         radius: 3
-                        color: "#333333"
+                        color: Qt.rgba(1, 1, 1, 0.18)
 
                         Rectangle {
                             id: progressFill
@@ -695,20 +731,16 @@ Item {
                             anchors.fill: parent
                             anchors.margins: -12
                             preventStealing: true
+                            // same wiring as the sidebar player: click = seek.
+                            // mouse.x is relative to this (12px-larger) area, so subtract the margin
+                            // and divide by the TRACK width, otherwise the position is offset.
                             onPressed: (mouse) => { mouse.accepted = true; controlPressed() }
-                            onClicked: (mouse) => { mouse.accepted = true }
-                            onPositionChanged: (mouse) => {
-                                if (!pressed) return
+                            onClicked: (mouse) => {
+                                mouse.accepted = true
                                 if (!activePlayer || !activePlayer.canSeek) return
-                                const fraction = Math.max(0, Math.min(1, mouse.x / width))
-                                const length = Number(activePlayer.length) || 0
-                                if (length > 0) activePlayer.position = fraction * length
-                            }
-                            onReleased: (mouse) => {
-                                if (!activePlayer || !activePlayer.canSeek) return
-                                const fraction = Math.max(0, Math.min(1, mouse.x / width))
-                                const length = Number(activePlayer.length) || 0
-                                if (length > 0) activePlayer.position = fraction * length
+                                const frac = Math.max(0, Math.min(1, (mouse.x - 12) / progressBar.width))
+                                const len = Number(activePlayer.length) || 0
+                                if (len > 0) activePlayer.position = frac * len
                             }
                         }
                     }

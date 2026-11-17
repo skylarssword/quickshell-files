@@ -807,7 +807,9 @@ PanelWindow {
                     if (musicPopup.popupOpen) {
                         appLauncher.close(); screenshotGallery.close()
                         infoPopup.close()
+                        notifCenter.close()
                         controlCenter.close()
+                        powerMenu.close()
                     }
                 }
             }

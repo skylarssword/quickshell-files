@@ -1955,6 +1955,7 @@ case "capturing":
                 case "info":
                     return 600;
                 case "expanded":
+                    return 680;
                 case "bluetooth_expanded":
                     return 400;
                 case "equalizer":
@@ -1998,7 +1999,7 @@ case "lyrics_control_center": {
 case "info":
                     return (mainCapsule.infoActiveTab === 0 || mainCapsule.infoActiveTab === 1) ? 360 : 300;
 case "expanded":
-                    return 193;
+                    return 130;
                 case "bluetooth_expanded":
                     return 165;
                 case "equalizer":
