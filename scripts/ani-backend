@@ -3,7 +3,8 @@
 # Scraping functions are copied verbatim from ani-cli (pystardust/ani-cli).
 # If ani-cli changes how it scrapes, re-sync the functions marked below.
 #
-#   ani-backend search <query>                  -> id<TAB>title per line
+#   ani-backend search <query>                  -> id<TAB>title<TAB>coverUrl per line (cover may be empty)
+#   ani-backend covers                          -> id<TAB>coverUrl for every cover seen so far
 #   ani-backend episodes <id>                   -> one episode number per line
 #   ani-backend play <id> <ep> <sub|dub> <title> -> launches the player, prints OK
 #   ani-backend history                         -> ep<TAB>id<TAB>title, most recent first
@@ -88,6 +89,16 @@ deobfuscate_blob() (
     printf "%b" "$_output"
 )
 
+# one poster URL per result, in page order (empty when the layout has no poster img)
+hianime_posters() {
+    printf "%s" "$1" | tr '\n' ' ' | grep -oE '<img[^>]*film-poster-img[^>]*>' | while IFS= read -r _tag; do
+        _u="$(printf "%s" "$_tag" | sed -nE 's|.*data-src="([^"]*)".*|\1|p')"
+        [ -z "$_u" ] && _u="$(printf "%s" "$_tag" | sed -nE 's|.*[[:space:]]src="([^"]*)".*|\1|p')"
+        case "$_u" in //*) _u="https:$_u" ;; esac
+        printf '%s\n' "$_u" | sed "s|&amp;|\&|g"
+    done
+}
+
 hianime_search() {
     #shellcheck disable=SC2059
     _page="$(hianime_curl "$(printf "$search_api" "$1")")" || return 1
@@ -96,9 +107,21 @@ hianime_search() {
         die "Blocked by cloudflare."
     fi
     # the top 10 sidebar repeats the result markup, cut it off before flattening the page
-    printf "%s" "$_page" | sed '/id="main-sidebar"/,$d' | tr '\n' ' ' | sed 's|<div class="film-detail">|\n<div class="film-detail">|g' |
+    _body="$(printf "%s" "$_page" | sed '/id="main-sidebar"/,$d')"
+    _ids="$(printf "%s" "$_body" | tr '\n' ' ' | sed 's|<div class="film-detail">|\n<div class="film-detail">|g' |
         sed -nE 's|.*<h3 class="film-name">[[:space:]]*<a href="[^"]*/([^"/]*)"[[:space:]]*title="([^"]*)".*|\1\t\2|p' |
-        sed -e "s|&#039;|'|g" -e 's|&quot;|"|g' -e "s|&amp;|\&|g"
+        sed -e "s|&#039;|'|g" -e 's|&quot;|"|g' -e "s|&amp;|\&|g")"
+    [ -z "$_ids" ] && return 0
+    # add the poster as a third column, but only when every result has exactly one
+    _pics="$(hianime_posters "$_body" 2>/dev/null)"
+    if [ -n "$_pics" ] && [ "$(printf '%s\n' "$_ids" | grep -c .)" = "$(printf '%s\n' "$_pics" | grep -c .)" ]; then
+        _ptmp="$(mktemp)"
+        printf '%s\n' "$_pics" >"$_ptmp"
+        printf '%s\n' "$_ids" | awk -F '\t' -v OFS='\t' 'NR == FNR { p[FNR] = $0; next } { print $1, $2, p[FNR] }' "$_ptmp" -
+        rm -f "$_ptmp"
+    else
+        printf '%s\n' "$_ids"
+    fi
 }
 
 hianime_episodes() {
@@ -173,11 +196,29 @@ bump_history() {
     } >"${histfile}.new" && mv "${histfile}.new" "$histfile"
 }
 
+# remember id<TAB>cover of everything searched, so history/home can show covers later (newest 300)
+save_covers() {
+    _cf="$hist_dir/covers"
+    {
+        [ -f "$_cf" ] && cat "$_cf"
+        printf '%s\n' "$1" | awk -F '\t' 'NF >= 3 && $3 != "" { print $1 "\t" $3 }'
+    } | awk -F '\t' '{ if (!($1 in o)) o[$1] = ++n; u[$1] = $2 } END { for (k in u) print o[k] "\t" k "\t" u[k] }' |
+        sort -n | tail -n 300 | cut -f 2,3 >"$_cf.new" && mv "$_cf.new" "$_cf"
+}
+
 cmd_search() {
     _q="$(printf '%s' "$*" | sed 's|^ *||; s| *$||; s| |+|g')"
     [ -z "$_q" ] && exit 0
     _list="$(hianime_search "$_q")" || exit 1
-    [ -n "$_list" ] && printf '%s\n' "$_list"
+    if [ -n "$_list" ]; then
+        printf '%s\n' "$_list"
+        save_covers "$_list" 2>/dev/null || true
+    fi
+    exit 0
+}
+
+cmd_covers() {
+    [ -f "$hist_dir/covers" ] && cat "$hist_dir/covers"
     exit 0
 }
 
@@ -344,6 +385,7 @@ case "$1" in
     episodes) cmd_episodes "$2" ;;
     play) cmd_play "$2" "$3" "$4" "$5" ;;
     history) cmd_history ;;
+    covers) cmd_covers ;;
     delete) cmd_delete "$2" ;;
     resume) cmd_resume ;;
     clear) cmd_clear ;;
@@ -351,5 +393,5 @@ case "$1" in
     autoplay) cmd_autoplay "$2" ;;
     finished) cmd_finished ;;
     version) cmd_version ;;
-    *) die "usage: ani-backend search|episodes|play|history|resume|delete|clear|autoplay|finished|version|reopen" ;;
+    *) die "usage: ani-backend search|episodes|play|history|covers|resume|delete|clear|autoplay|finished|version|reopen" ;;
 esac

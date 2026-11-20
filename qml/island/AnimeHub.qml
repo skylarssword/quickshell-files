@@ -4,16 +4,16 @@ import Quickshell.Io
 import "../shared"
 
 // AnimeHub: stacked under the search pill when you type "anime".
-// Left: search results + watch history. Right: episode grid.
+// Three tabs on a left rail: Home (continue watching), Search (poster grid) and
+// List (history + episode grid). The pill above stays a static "anime" line.
 // All network work goes through scripts/ani-backend (copied from ani-cli's scraper).
 //
-// Keys (focus always stays in the search box):
+// Keys (focus always stays in the hidden input; typing anywhere jumps to Search):
 //   type            search (debounced)
-//   Up / Down       move through results, or through the episode grid
-//   Right (at end)  jump into the episode grid   |   Left (first column) jump back
-//   Enter           open the highlighted anime   |   play the highlighted episode
+//   Arrows          move through the poster grid / history list / episode grid
+//   Enter           Home: continue  |  Search: open  |  List: open, then play the episode
 //   Tab             toggle sub / dub
-//   Esc             back to results -> clear search -> close
+//   Esc             back to the list -> clear search -> Home -> close
 
 Item {
     id: root
@@ -26,13 +26,14 @@ Item {
     // ── layout ────────────────────────────────────────────────────────────────
     readonly property int capsuleWidth: 640
     readonly property int bannerHeight: 28
-    readonly property int headerHeight: 46
+    readonly property int railWidth: 58
     readonly property int panelsHeight: 290
     readonly property int footerHeight: 46
-    readonly property int resultsWidth: 236
+    readonly property int resultsWidth: 244
+    readonly property int searchCols: 5
     readonly property int epCols: 6
     readonly property bool showBanner: versionState === "outdated"
-    readonly property int capsuleHeight: (showBanner ? bannerHeight : 0) + headerHeight + panelsHeight + footerHeight
+    readonly property int capsuleHeight: (showBanner ? bannerHeight : 0) + panelsHeight + footerHeight
 
     width: capsuleWidth
     height: capsuleHeight
@@ -42,13 +43,17 @@ Item {
     // ── state ─────────────────────────────────────────────────────────────────
     readonly property string backend: Quickshell.shellDir + "/scripts/ani-backend"
 
+    property string tab: "home"            // "home" | "search" | "list"
     property string mode: "sub"            // "sub" | "dub"
-    property string zone: "results"        // "results" | "episodes"
+    property string zone: "results"        // list tab: "results" (history column) | "episodes"
     property string query: ""
 
-    property var    results: []            // [{ id, title }]
+    property var    results: []            // [{ id, title, cover }]
     property var    history: []            // [{ ep, id, title }], most recent first
-    property int    resultIndex: 0
+    property int    resultIndex: 0         // search grid cursor
+    property int    listIndex: 0           // list tab (history) cursor
+    property var    covers: ({})           // { animeId: coverUrl } filled from searches
+    property bool   pendingPlay: false     // play as soon as the episodes have loaded
 
     property string selectedId: ""
     property string selectedTitle: ""
@@ -91,26 +96,34 @@ Item {
     property bool _searchDirty: false
     property bool _epDirty: false
 
-    // results first, then history (history rows for anime already in results are folded in)
-    readonly property var rows: {
-        const q = query.trim().toLowerCase()
-        const lastEp = {}
-        for (let i = 0; i < history.length; i++) lastEp[history[i].id] = history[i].ep
-
-        let out = []
-        const seen = {}
-        for (let i = 0; i < results.length; i++) {
-            seen[results[i].id] = true
-            out.push({ id: results[i].id, title: results[i].title, section: "Results", ep: lastEp[results[i].id] || "", resume: resume[results[i].id] || null })
-        }
+    // List tab: history, plus the anime you opened from Search when it isn't in history yet
+    readonly property var listRows: {
+        const out = []
+        let found = false
         for (let j = 0; j < history.length; j++) {
             const h = history[j]
-            if (seen[h.id]) continue
-            if (q !== "" && h.title.toLowerCase().indexOf(q) < 0) continue
-            out.push({ id: h.id, title: h.title, section: "History", ep: h.ep, resume: resume[h.id] || null })
+            if (h.id === selectedId) found = true
+            out.push({ id: h.id, title: h.title, ep: h.ep, resume: resume[h.id] || null })
+        }
+        if (selectedId !== "" && !found)
+            out.unshift({ id: selectedId, title: selectedTitle, ep: "", resume: null })
+        return out
+    }
+
+    // items of the tab that has the cursor
+    readonly property var rows: tab === "search" ? results : listRows
+
+    // anime that have a saved spot, newest first (Home strip)
+    readonly property var pausedRows: {
+        const out = []
+        for (let j = 0; j < history.length; j++) {
+            const r = resume[history[j].id]
+            if (r) out.push({ id: history[j].id, title: history[j].title, ep: r.ep, pos: r.pos })
         }
         return out
     }
+
+    function coverFor(id) { return covers[id] || "" }
 
     // ── helpers ───────────────────────────────────────────────────────────────
     function lines(raw) {
@@ -155,8 +168,21 @@ Item {
     // ── navigation ────────────────────────────────────────────────────────────
     function moveRow(d) {
         if (rows.length === 0) return
-        resultIndex = Math.max(0, Math.min(rows.length - 1, resultIndex + d))
-        resultsList.positionViewAtIndex(resultIndex, ListView.Contain)
+        if (tab === "search") {
+            resultIndex = Math.max(0, Math.min(rows.length - 1, resultIndex + d))
+            resultsGrid.positionViewAtIndex(resultIndex, GridView.Contain)
+        } else {
+            listIndex = Math.max(0, Math.min(rows.length - 1, listIndex + d))
+            resultsList.positionViewAtIndex(listIndex, ListView.Contain)
+        }
+    }
+
+    function setTab(t) {
+        cancelCountdown()
+        if (t === "list" && selectedId === "" && history.length > 0) { continueWatching(); return }
+        tab = t
+        if (t === "list" && episodes.length === 0) zone = "results"
+        focusInput()
     }
 
     function moveEp(d) {
@@ -201,6 +227,9 @@ Item {
         watchedIdx = -1
         errorText = ""
         zone = "episodes"
+        tab = "list"
+        listIndex = Math.max(0, listRows.findIndex(r => r.id === id))
+        Qt.callLater(() => resultsList.positionViewAtIndex(root.listIndex, ListView.Contain))
         loadingEps = true
         runEpisodes()
     }
@@ -208,7 +237,7 @@ Item {
     function openRow(i) {
         const row = rows[i]
         if (!row) return
-        resultIndex = i
+        if (tab === "search") resultIndex = i; else listIndex = i
         selectAnime(row.id, row.title)
     }
 
@@ -217,14 +246,26 @@ Item {
         selectAnime(history[0].id, history[0].title)
     }
 
+    // Home hero: open the latest show and start the episode you were on
+    function resumeLatest() {
+        if (history.length === 0) return
+        pendingPlay = true
+        selectAnime(history[0].id, history[0].title)
+    }
+
     function activate() {
-        if (zone === "results") {
+        if (tab === "home") { continueWatching(); return }
+        if (tab === "search") {
             if (searchDebounce.running) {      // user hit Enter before the debounce fired
                 searchDebounce.stop()
                 runSearch()
                 return
             }
             if (rows.length > 0) openRow(resultIndex)
+            return
+        }
+        if (zone === "results") {
+            if (rows.length > 0) openRow(listIndex)
         } else {
             playSelected()
         }
@@ -252,12 +293,15 @@ Item {
                 const ls = lines(out)
                 for (let i = 0; i < ls.length; i++) {
                     const p = ls[i].split("\t")
-                    if (p.length >= 2) parsed.push({ id: p[0], title: p.slice(1).join("\t") })
+                    if (p.length >= 2) parsed.push({ id: p[0], title: p[1], cover: p.length > 2 ? p[2] : "" })
                 }
+                const c = Object.assign({}, covers)
+                for (let k = 0; k < parsed.length; k++) if (parsed[k].cover !== "") c[parsed[k].id] = parsed[k].cover
+                covers = c
                 results = parsed
             }
             resultIndex = 0
-            Qt.callLater(() => resultsList.positionViewAtBeginning())
+            Qt.callLater(() => resultsGrid.positionViewAtBeginning())
         }
         if (_searchDirty) {
             _searchDirty = false
@@ -279,6 +323,7 @@ Item {
             if (err.trim() !== "") {
                 episodes = []
                 pendingAutoplay = null
+                pendingPlay = false
                 errorText = failureText(firstError(err))
             } else {
                 const eps = lines(out).map(l => l.trim())
@@ -304,6 +349,7 @@ Item {
                 }
                 pendingAutoplay = null
                 Qt.callLater(() => epGrid.positionViewAtIndex(root.epIndex, GridView.Contain))
+                if (pendingPlay) { pendingPlay = false; Qt.callLater(root.playSelected) }
             }
         }
         if (_epDirty) {
@@ -342,7 +388,7 @@ Item {
         delete r[id]
         resume = r
         if (selectedId === id) watchedIdx = -1
-        resultIndex = Math.max(0, Math.min(resultIndex, rows.length - 1))
+        listIndex = Math.max(0, Math.min(listIndex, listRows.length - 1))
     }
 
     function clearHistory() {
@@ -350,7 +396,7 @@ Item {
         history = []
         resume = ({})
         watchedIdx = -1
-        resultIndex = Math.max(0, Math.min(resultIndex, rows.length - 1))
+        listIndex = Math.max(0, Math.min(listIndex, listRows.length - 1))
     }
 
     function loadHistory(raw) {
@@ -363,6 +409,16 @@ Item {
         history = parsed
         _histLoaded = true
         maybeAutoContinue()
+    }
+
+    function loadCovers(raw) {
+        const c = Object.assign({}, covers)
+        const ls = lines(raw)
+        for (let i = 0; i < ls.length; i++) {
+            const p = ls[i].split("\t")
+            if (p.length >= 2 && p[1] !== "" && !c[p[0]]) c[p[0]] = p[1]
+        }
+        covers = c
     }
 
     function loadResume(raw) {
@@ -388,6 +444,7 @@ Item {
     // once history, saved spots, the Auto flag and the finished marker are in, select the latest show
     function maybeAutoContinue() {
         if (!autoContinue || !_histLoaded || !_resumeLoaded || !_finishedLoaded || !_autoplayLoaded) return
+        if (history.length === 0 && selectedId === "") tab = "home"
         if (selectedId !== "" || history.length === 0) return
         autoContinue = false
 
@@ -410,6 +467,8 @@ Item {
         autoplayProc.running = true
         finishedProc.running = true
         versionProc.running = true
+        coversProc.running = true
+        if (autoContinue) tab = "list"      // reopened after mpv: go straight to the episodes
         focusInput()
     }
 
@@ -548,6 +607,19 @@ Item {
     }
 
     Process {
+        id: coversProc
+        property string out: ""
+        command: ["bash", root.backend, "covers"]
+        stdout: SplitParser { onRead: coversProc.out += data + "\n" }
+        onRunningChanged: {
+            if (running) return
+            const o = out
+            out = ""
+            root.loadCovers(o)
+        }
+    }
+
+    Process {
         id: versionProc
         property string out: ""
         command: ["bash", root.backend, "version"]
@@ -563,173 +635,351 @@ Item {
     }
 
     // ── ui ────────────────────────────────────────────────────────────────────
-    Column {
-        anchors.fill: parent
+    readonly property int topInset: showBanner ? bannerHeight : 0
 
-        // update banner
-        Item {
-            width: parent.width
-            height: root.showBanner ? root.bannerHeight : 0
-            visible: root.showBanner
+    // update banner
+    Item {
+        width: parent.width
+        height: root.topInset
+        visible: root.showBanner
 
-            Rectangle {
-                anchors.fill: parent
-                anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.topMargin: 2
-                radius: 12
-                color: Qt.rgba(1.0, 0.76, 0.28, 0.10)
+        Rectangle {
+            anchors.fill: parent
+            anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.topMargin: 2
+            radius: 12
+            color: Qt.rgba(1.0, 0.76, 0.28, 0.10)
+        }
+
+        Row {
+            anchors.centerIn: parent
+            spacing: 8
+            Text {
+                renderType: Text.NativeRendering
+                text: ""
+                font.family: root.iconFontFamily
+                font.pixelSize: 11
+                color: Qt.rgba(1.0, 0.82, 0.45, 0.95)
+                anchors.verticalCenter: parent.verticalCenter
             }
+            Text {
+                renderType: Text.NativeRendering
+                text: "ani-cli " + root.versionLocal + " → " + root.versionRemote + " available. Update it if search or playback fails."
+                font.family: root.textFontFamily
+                font.pixelSize: 11
+                color: Qt.rgba(1.0, 0.82, 0.45, 0.95)
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+    }
 
-            Row {
-                anchors.centerIn: parent
-                spacing: 8
-                Text {
-                    renderType: Text.NativeRendering
-                    text: "\uf071"
-                    font.family: root.iconFontFamily
-                    font.pixelSize: 11
-                    color: Qt.rgba(1.0, 0.82, 0.45, 0.95)
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Text {
-                    renderType: Text.NativeRendering
-                    text: "ani-cli " + root.versionLocal + " → " + root.versionRemote + " available. Update it if search or playback fails."
-                    font.family: root.textFontFamily
-                    font.pixelSize: 11
-                    color: Qt.rgba(1.0, 0.82, 0.45, 0.95)
-                    anchors.verticalCenter: parent.verticalCenter
+    // ── tab rail (three round tabs, centered in the line) ─────────────────────
+    Item {
+        id: rail
+        x: 0
+        y: root.topInset
+        width: root.railWidth
+        height: root.panelsHeight + root.footerHeight
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 12
+
+            Repeater {
+                model: [ "home", "search", "list" ]
+                delegate: Rectangle {
+                    id: tabBtn
+                    required property string modelData
+                    readonly property bool active: root.tab === modelData
+                    width: 36; height: 36; radius: 18
+                    color: active ? Qt.rgba(1, 1, 1, 0.14) : (tabMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
+                    border.width: 1
+                    border.color: active ? Qt.rgba(1, 1, 1, 0.34) : "transparent"
+                    Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+
+                    GlassSheen { visible: tabBtn.active }
+
+                    AnimeIcon {
+                        id: tabIcon
+                        anchors.centerIn: parent
+                        kind: tabBtn.modelData; sz: 17
+                        col: "white"
+                        opacity: tabBtn.active ? 1.0 : (tabMouse.containsMouse ? 0.8 : 0.5)
+                        scale: tabMouse.pressed ? 0.86 : 1.0
+                        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutBack; easing.overshoot: 3 } }
+                    }
+                    MouseArea {
+                        id: tabMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.setTab(tabBtn.modelData)
+                    }
                 }
             }
         }
+    }
 
-        // search row
+    // thin dividers instead of gray panels
+    Rectangle {
+        x: root.railWidth - 1; y: root.topInset + 14
+        width: 1; height: root.panelsHeight + root.footerHeight - 28
+        color: Qt.rgba(1, 1, 1, 0.09)
+    }
+    Rectangle {
+        x: root.railWidth + 8; y: root.topInset + root.panelsHeight
+        width: root.width - root.railWidth - 22; height: 1
+        color: Qt.rgba(1, 1, 1, 0.09)
+    }
+
+    // ── body ──────────────────────────────────────────────────────────────────
+    Item {
+        id: bodyArea
+        x: root.railWidth
+        y: root.topInset
+        width: root.width - root.railWidth
+        height: root.panelsHeight
+
+        // ───────────────────────── HOME ─────────────────────────
         Item {
-            width: parent.width
-            height: root.headerHeight
+            id: homeTab
+            anchors.fill: parent
+            visible: root.tab === "home"
 
-            // rounded search pill, same look as the wallpaper hub's
+            readonly property var h0: root.history.length > 0 ? root.history[0] : null
+
+            // hero
+            Item {
+                id: hero
+                x: 6; y: 2; width: 372; height: 160
+
+                AnimeCover {
+                    anchors.fill: parent
+                    radius: 22
+                    source: homeTab.h0 ? root.coverFor(homeTab.h0.id) : ""
+                    label: homeTab.h0 ? homeTab.h0.title : ""
+                }
+                Rectangle {
+                    anchors.fill: parent; radius: 22
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.72) }
+                        GradientStop { position: 0.75; color: Qt.rgba(0, 0, 0, 0.0) }
+                    }
+                }
+                Column {
+                    x: 20; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -8
+                    width: parent.width * 0.62
+                    spacing: 4
+                    Text {
+                        renderType: Text.NativeRendering
+                        width: parent.width
+                        text: homeTab.h0 ? homeTab.h0.title : "Nothing watched yet"
+                        elide: Text.ElideRight
+                        font.family: root.textFontFamily
+                        font.pixelSize: 19
+                        font.bold: true
+                        color: "white"
+                    }
+                    Text {
+                        renderType: Text.NativeRendering
+                        width: parent.width
+                        elide: Text.ElideRight
+                        font.family: root.textFontFamily
+                        font.pixelSize: 11
+                        color: "white"
+                        opacity: 0.7
+                        text: !homeTab.h0 ? "Search an anime to get started"
+                              : (root.resume[homeTab.h0.id]
+                                 ? "Paused · ep " + root.resume[homeTab.h0.id].ep + " at " + root.fmtTime(root.resume[homeTab.h0.id].pos)
+                                 : "Continue watching · ep " + homeTab.h0.ep)
+                    }
+                }
+                Row {
+                    x: 20; y: parent.height - 44
+                    spacing: 8
+                    AnimeButton {
+                        visible: homeTab.h0 !== null
+                        label: root.resume[homeTab.h0 ? homeTab.h0.id : ""] ? "Resume" : "Continue"
+                        iconKind: "play"; primary: true; fontFamily: root.textFontFamily
+                        onClicked: { root.resumeLatest(); root.focusInput() }
+                    }
+                    AnimeButton {
+                        visible: homeTab.h0 !== null
+                        label: "Episodes"; iconKind: "list"; fontFamily: root.textFontFamily
+                        onClicked: { root.continueWatching(); root.focusInput() }
+                    }
+                    AnimeButton {
+                        visible: homeTab.h0 === null
+                        label: "Search anime"; iconKind: "search"; primary: true; fontFamily: root.textFontFamily
+                        onClicked: root.setTab("search")
+                    }
+                }
+            }
+
+            // recent shows
+            Column {
+                x: 386; y: 2
+                spacing: 8
+                Repeater {
+                    model: 3
+                    delegate: Item {
+                        id: tile
+                        required property int index
+                        readonly property var h: root.history.length > index + 1 ? root.history[index + 1] : null
+                        width: 188; height: 48
+                        visible: h !== null
+
+                        AnimeCover {
+                            anchors.fill: parent; radius: 14
+                            source: tile.h ? root.coverFor(tile.h.id) : ""
+                            label: tile.h ? tile.h.title : ""
+                        }
+                        Rectangle {
+                            anchors.fill: parent; radius: 14
+                            color: tileMouse.containsMouse ? Qt.rgba(0, 0, 0, 0.40) : Qt.rgba(0, 0, 0, 0.55)
+                            Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+                        }
+                        Column {
+                            anchors.left: parent.left; anchors.leftMargin: 12
+                            anchors.right: parent.right; anchors.rightMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 0
+                            Text {
+                                renderType: Text.NativeRendering
+                                width: parent.width
+                                text: tile.h ? tile.h.title : ""
+                                elide: Text.ElideRight
+                                font.family: root.textFontFamily; font.pixelSize: 12
+                                color: "white"
+                            }
+                            Text {
+                                renderType: Text.NativeRendering
+                                text: tile.h ? "Ep " + tile.h.ep : ""
+                                font.family: root.textFontFamily; font.pixelSize: 10
+                                color: "white"; opacity: 0.6
+                            }
+                        }
+                        MouseArea {
+                            id: tileMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.selectAnime(tile.h.id, tile.h.title); root.focusInput() }
+                        }
+                    }
+                }
+            }
+
+            // paused shows
+            Text {
+                renderType: Text.NativeRendering
+                x: 10; y: 174
+                text: "Continue Watching"
+                font.family: root.textFontFamily; font.pixelSize: 13; font.bold: true
+                color: "white"; opacity: 0.95
+            }
+            Row {
+                x: 6; y: 198
+                spacing: 8
+                Repeater {
+                    model: root.pausedRows.slice(0, 4)
+                    delegate: Item {
+                        id: card
+                        required property var modelData
+                        width: 134; height: 82
+
+                        AnimeCover {
+                            anchors.fill: parent; radius: 14
+                            source: root.coverFor(card.modelData.id)
+                            label: card.modelData.title
+                        }
+                        Rectangle {
+                            anchors.fill: parent; radius: 14
+                            gradient: Gradient {
+                                GradientStop { position: 0.35; color: Qt.rgba(0, 0, 0, cardMouse.containsMouse ? 0.0 : 0.1) }
+                                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.78) }
+                            }
+                        }
+                        Column {
+                            x: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 8
+                            width: parent.width - 20
+                            spacing: 0
+                            Text {
+                                renderType: Text.NativeRendering
+                                width: parent.width
+                                text: card.modelData.title
+                                elide: Text.ElideRight
+                                font.family: root.textFontFamily; font.pixelSize: 11
+                                color: "white"
+                            }
+                            Text {
+                                renderType: Text.NativeRendering
+                                text: "ep " + card.modelData.ep + " · " + root.fmtTime(card.modelData.pos)
+                                font.family: root.textFontFamily; font.pixelSize: 10
+                                color: "white"; opacity: 0.6
+                            }
+                        }
+                        MouseArea {
+                            id: cardMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.selectAnime(card.modelData.id, card.modelData.title); root.focusInput() }
+                        }
+                    }
+                }
+            }
+            Text {
+                renderType: Text.NativeRendering
+                x: 10; y: 226
+                visible: root.pausedRows.length === 0
+                text: root.history.length === 0 ? "Shows you watch will show up here"
+                      : "Nothing paused. Press c in mpv to save your spot."
+                font.family: root.textFontFamily; font.pixelSize: 12
+                color: "white"; opacity: 0.3
+            }
+        }
+
+        // ───────────────────────── SEARCH ─────────────────────────
+        Item {
+            id: searchTab
+            anchors.fill: parent
+            visible: root.tab === "search"
+
             Rectangle {
                 id: searchBox
                 GlassSheen {}
-                anchors.left: parent.left; anchors.leftMargin: 10
-                anchors.right: parent.right; anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                height: 30
-                radius: 15
+                x: 8; y: 2
+                width: parent.width - 16; height: 32; radius: 16
                 color: Qt.rgba(1, 1, 1, 0.06)
                 border.color: Qt.rgba(1, 1, 1, 0.12)
                 border.width: 1
-            }
-
-            Row {
-                anchors.fill: parent
-                anchors.leftMargin: 28
-                anchors.rightMargin: 28
-                spacing: 10
 
                 Text {
                     renderType: Text.NativeRendering
-                    text: "\uf002"
+                    x: 14; anchors.verticalCenter: parent.verticalCenter
+                    text: ""
                     font.family: root.iconFontFamily
                     font.pixelSize: 13
-                    color: "white"
-                    opacity: 0.4
-                    anchors.verticalCenter: parent.verticalCenter
+                    color: "white"; opacity: 0.4
                 }
-
-                TextInput {
-                    renderType: TextInput.NativeRendering
-                    id: searchInput
-                    width: parent.width - 60
-                    height: 30
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: "white"
-                    font.pixelSize: 13
-                    font.family: root.textFontFamily
-                    verticalAlignment: TextInput.AlignVCenter
-                    activeFocusOnPress: true
-                    clip: true
-
-                    onTextChanged: {
-                        root.query = text
-                        root.resultIndex = 0
-                        root.zone = "results"
-                        root.searchError = ""
-                        if (text.trim().length < 2) {
-                            searchDebounce.stop()
-                            root.results = []
-                            root.searching = false
-                        } else {
-                            root.searching = true
-                            searchDebounce.restart()
-                        }
-                    }
-
-                    // keys without their own handler below (letters, backspace, ...)
-                    Keys.onPressed: (event) => {
-                        if (root.cancelCountdown()) event.accepted = true
-                    }
-
-                    Keys.onEscapePressed: {
-                        if (root.cancelCountdown()) return
-                        if (root.zone === "episodes") root.zone = "results"
-                        else if (text.length > 0) text = ""
-                        else root.closeRequested()
-                    }
-                    Keys.onReturnPressed: { if (!root.cancelCountdown()) root.activate() }
-                    Keys.onEnterPressed: { if (!root.cancelCountdown()) root.activate() }
-                    Keys.onTabPressed: { if (!root.cancelCountdown()) root.toggleMode() }
-                    Keys.onUpPressed: {
-                        if (root.cancelCountdown()) return
-                        if (root.zone === "results") root.moveRow(-1)
-                        else root.moveEp(-root.epCols)
-                    }
-                    Keys.onDownPressed: {
-                        if (root.cancelCountdown()) return
-                        if (root.zone === "results") root.moveRow(1)
-                        else root.moveEp(root.epCols)
-                    }
-                    Keys.onLeftPressed: (event) => {
-                        if (root.cancelCountdown()) return
-                        if (root.zone === "episodes") {
-                            if (root.epIndex % root.epCols === 0) root.zone = "results"
-                            else root.moveEp(-1)
-                        } else {
-                            event.accepted = false      // normal caret movement
-                        }
-                    }
-                    Keys.onRightPressed: (event) => {
-                        if (root.cancelCountdown()) return
-                        if (root.zone === "episodes") {
-                            root.moveEp(1)
-                        } else if (root.episodes.length > 0 && cursorPosition >= text.length) {
-                            root.zone = "episodes"
-                        } else {
-                            event.accepted = false
-                        }
-                    }
-
-                    Text {
-                        renderType: Text.NativeRendering
-                        anchors.fill: parent
-                        verticalAlignment: Text.AlignVCenter
-                        text: "Search anime…"
-                        color: "white"
-                        opacity: 0.22
-                        font.pixelSize: 13
-                        font.family: root.textFontFamily
-                        visible: searchInput.text.length === 0
-                    }
+                Text {
+                    renderType: Text.NativeRendering
+                    x: 40; anchors.verticalCenter: parent.verticalCenter
+                    text: "Search anime…"
+                    visible: searchInput.text.length === 0
+                    font.family: root.textFontFamily; font.pixelSize: 13
+                    color: "white"; opacity: 0.22
                 }
-
                 Text {
                     id: spinner
                     renderType: Text.NativeRendering
-                    text: "\uf110"
+                    anchors.right: parent.right; anchors.rightMargin: 16
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: ""
                     font.family: root.iconFontFamily
                     font.pixelSize: 13
-                    color: "white"
-                    opacity: 0.5
-                    anchors.verticalCenter: parent.verticalCenter
+                    color: "white"; opacity: 0.5
                     visible: root.searching || root.loadingEps || root.playing
                     RotationAnimator on rotation {
                         from: 0; to: 360
@@ -739,246 +989,283 @@ Item {
                     }
                 }
             }
-        }
 
-        // panels
-        Item {
-            width: parent.width
-            height: root.panelsHeight
+            GridView {
+                id: resultsGrid
+                anchors.top: searchBox.bottom; anchors.topMargin: 6
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left; anchors.right: parent.right
+                anchors.leftMargin: 6; anchors.rightMargin: 6
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                cellWidth: Math.floor(width / root.searchCols)
+                cellHeight: 122
+                model: root.results
 
-            // left: results + history
-            Item {
-                id: leftPanel
-                width: root.resultsWidth
-                height: parent.height
+                delegate: Item {
+                    id: resItem
+                    required property var modelData
+                    required property int index
+                    readonly property bool isCursor: index === root.resultIndex
+                    width: resultsGrid.cellWidth
+                    height: resultsGrid.cellHeight
 
-                // results card
-                Rectangle {
-                    id: resultsCard
-                    GlassSheen {}
-                    anchors.fill: parent
-                    anchors.leftMargin: 10; anchors.rightMargin: 5
-                    anchors.topMargin: 4; anchors.bottomMargin: 6
-                    radius: 20
-                    color: Qt.rgba(1, 1, 1, 0.05)
-                    border.color: Qt.rgba(1, 1, 1, 0.10)
-                    border.width: 1
-                }
-
-                ListView {
-                    id: resultsList
-                    anchors.fill: resultsCard
-                    anchors.margins: 4
-                    leftMargin: 4; rightMargin: 4; topMargin: 4; bottomMargin: 4   // content inset: rows stay where they were, the clip area is 4px bigger
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    model: root.rows
-
-                    delegate: Item {
-                        id: rowItem
-                        required property var modelData
-                        required property int index
-
-                        readonly property bool showSection: index === 0 || root.rows[index - 1].section !== modelData.section
-                        readonly property bool isCursor: index === root.resultIndex
-                        readonly property bool isOpen: modelData.id === root.selectedId
-
-                        width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
-                        height: (showSection ? 24 : 0) + 42
-
-                        // swipe-left-to-delete (same mechanism as the notification center)
-                        readonly property bool canDelete: modelData.ep !== ""
-                        property real dragX: 0
-                        property bool dragging: false
-                        property bool pendingDismiss: false
-                        readonly property real maxSwipe: -88
-                        readonly property real dismissThreshold: -56
-
-                        Behavior on dragX {
-                            enabled: !rowItem.dragging
-                            NumberAnimation {
-                                duration: 260
-                                easing.type: Easing.OutQuart
-                                onRunningChanged: {
-                                    if (!running && rowItem.pendingDismiss) {
-                                        rowItem.pendingDismiss = false
-                                        root.deleteHistory(rowItem.modelData.id)
-                                    }
-                                }
-                            }
-                        }
-
-                        Text {
-                            renderType: Text.NativeRendering
-                            visible: rowItem.showSection
-                            text: rowItem.modelData.section
-                            font.family: root.textFontFamily
-			    font.weight: Font.Medium
-                            font.pixelSize: 13
-                            font.letterSpacing: 1
-                            color: "white"
-                            opacity: 0.95
-                            x: 10
-                            y: -7
-                        }
-
-                        Rectangle {
-                            anchors.right: parent.right
-                            y: rowItem.showSection ? 24 : 0
-                            width: Math.max(0, -rowItem.dragX)
-                            height: 40
-                            radius: 20
-                            clip: true
-                            color: Qt.rgba(0.86, 0.26, 0.26, 1)
-                            visible: rowItem.dragX < -4
-
-                            Text {
-                                renderType: Text.NativeRendering
-                                anchors.right: parent.right
-                                anchors.rightMargin: 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "\uf1f8"
-                                font.family: root.iconFontFamily
-                                font.pixelSize: 14
-                                color: "white"
-                                opacity: Math.min(1, -rowItem.dragX / -rowItem.dismissThreshold)
-                            }
-                        }
-
-                        Rectangle {
-                            GlassSheen { visible: rowItem.isCursor || rowItem.isOpen || rowMouse.containsMouse }
-                            x: rowItem.dragX
-                            y: rowItem.showSection ? 24 : 0
-                            width: parent.width
-                            height: 40
-                            radius: 20
-                            color: rowItem.isCursor
-                                   ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.12 : 0.07)
-                                   : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06)
-                                      : (rowItem.isOpen ? Qt.rgba(1, 1, 1, 0.05) : "transparent"))
-                            Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
-
-                            Column {
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.leftMargin: 16
-                                anchors.rightMargin: 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: -5
-
-                                Text {
-                                    renderType: Text.NativeRendering
-                                    width: parent.width
-                                    text: rowItem.modelData.title
-                                    elide: Text.ElideRight
-                                    font.family: root.textFontFamily
-                                    font.pixelSize: 13
-                                    color: "white"
-                                    opacity: rowItem.isCursor || rowItem.isOpen ? 0.95 : 0.68
-                                }
-                                Text {
-                                    renderType: Text.NativeRendering
-                                    visible: rowItem.modelData.ep !== ""
-                                    width: parent.width
-                                    text: rowItem.modelData.resume
-                                          ? "Paused: ep " + rowItem.modelData.resume.ep + " at " + root.fmtTime(rowItem.modelData.resume.pos)
-                                          : "Last watched: ep " + rowItem.modelData.ep
-                                    elide: Text.ElideRight
-                                    font.family: root.textFontFamily
-                                    font.pixelSize: 10
-                                    color: "white"
-                                    opacity: 0.32
-                                }
-                            }
-
-                        }
-
-                        // Sits outside the moving card so the cursor position
-                        // doesn't shift while dragging (1:1 swipe).
-                        MouseArea {
-                            id: rowMouse
-                            x: 0
-                            y: rowItem.showSection ? 24 : 0
-                            width: rowItem.width
-                            height: 40
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-
-                            property real pressX: 0
-                            property bool moved: false
-
-                            onPressed: function(mouse) {
-                                pressX = mouse.x
-                                moved = false
-                                rowItem.dragging = true
-                            }
-
-                            onPositionChanged: function(mouse) {
-                                if (!pressed || !rowItem.canDelete) return
-                                const delta = Math.min(0, mouse.x - pressX)
-                                if (!moved && Math.abs(delta) > 6) moved = true
-                                if (moved) rowItem.dragX = Math.max(rowItem.maxSwipe, delta)
-                            }
-
-                            onReleased: {
-                                rowItem.dragging = false
-                                if (moved) {
-                                    if (rowItem.dragX <= rowItem.dismissThreshold) {
-                                        rowItem.pendingDismiss = true
-                                        rowItem.dragX = -rowItem.width
-                                    } else {
-                                        rowItem.dragX = 0
-                                    }
-                                    root.focusInput()
-                                    return
-                                }
-                                root.openRow(rowItem.index)
-                                root.focusInput()
-                            }
-
-                            onCanceled: {
-                                rowItem.dragging = false
-                                rowItem.dragX = 0
-                            }
-                        }
+                    AnimeCover {
+                        x: 5; y: 2
+                        width: parent.width - 10; height: 92
+                        radius: 14
+                        source: resItem.modelData.cover
+                        label: resItem.modelData.title
                     }
-                }
-
-                // empty / error states
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.centerIn: parent
-                    width: parent.width - 36
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    visible: root.rows.length === 0 || root.searchError !== ""
-                    font.family: root.textFontFamily
-                    font.pixelSize: 12
-                    color: root.searchError !== "" ? Qt.rgba(1.0, 0.62, 0.55, 0.95) : "white"
-                    opacity: root.searchError !== "" ? 1.0 : 0.3
-                    text: root.searchError !== "" ? root.searchError
-                          : (root.searching ? "Searching…"
-                             : (root.query.trim().length >= 2 ? "No results" : "Type to search anime"))
+                    Rectangle {
+                        x: 5; y: 2
+                        width: parent.width - 10; height: 92
+                        radius: 14
+                        color: resMouse.containsMouse && !resItem.isCursor ? Qt.rgba(1, 1, 1, 0.10) : "transparent"
+                        border.width: resItem.isCursor ? 2 : 0
+                        border.color: Qt.rgba(1, 1, 1, 0.85)
+                    }
+                    Text {
+                        renderType: Text.NativeRendering
+                        x: 7; y: 98
+                        width: parent.width - 14
+                        text: resItem.modelData.title
+                        elide: Text.ElideRight
+                        font.family: root.textFontFamily; font.pixelSize: 11
+                        color: "white"
+                        opacity: resItem.isCursor ? 1.0 : 0.7
+                    }
+                    MouseArea {
+                        id: resMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: { root.resultIndex = resItem.index; root.openRow(resItem.index); root.focusInput() }
+                    }
                 }
             }
 
-            // right: episodes card
-            Item {
-                anchors.left: leftPanel.right
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                anchors.leftMargin: 5; anchors.rightMargin: 10
-                anchors.topMargin: 4; anchors.bottomMargin: 6
+            Text {
+                renderType: Text.NativeRendering
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 140
+                width: parent.width - 48
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                visible: root.results.length === 0 || root.searchError !== ""
+                font.family: root.textFontFamily
+                font.pixelSize: 12
+                color: root.searchError !== "" ? Qt.rgba(1.0, 0.62, 0.55, 0.95) : "white"
+                opacity: root.searchError !== "" ? 1.0 : 0.3
+                text: root.searchError !== "" ? root.searchError
+                      : (root.searching ? "Searching…"
+                         : (root.query.trim().length >= 2 ? "No results" : "Type to search anime"))
+            }
+        }
 
-                Rectangle {
-                    GlassSheen {}
-                    anchors.fill: parent
-                    radius: 20
-                    color: Qt.rgba(1, 1, 1, 0.05)
-                    border.color: Qt.rgba(1, 1, 1, 0.10)
-                    border.width: 1
+        // ───────────────────────── LIST ─────────────────────────
+        Item {
+            id: listTab
+            anchors.fill: parent
+            visible: root.tab === "list"
+
+            Text {
+                renderType: Text.NativeRendering
+                x: 16; y: 8
+                text: "History"
+                font.family: root.textFontFamily; font.pixelSize: 13; font.bold: true
+                color: "white"; opacity: 0.95
+            }
+
+            ListView {
+                id: resultsList
+                x: 6; y: 32
+                width: root.resultsWidth - 6
+                height: parent.height - 36
+                leftMargin: 2; rightMargin: 2; topMargin: 0; bottomMargin: 4
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                model: root.listRows
+
+                delegate: Item {
+                    id: rowItem
+                    required property var modelData
+                    required property int index
+
+                    readonly property bool isCursor: index === root.listIndex
+                    readonly property bool isOpen: modelData.id === root.selectedId
+
+                    width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
+                    height: 60
+
+                    // swipe-left-to-delete (same mechanism as the notification center)
+                    readonly property bool canDelete: modelData.ep !== ""
+                    property real dragX: 0
+                    property bool dragging: false
+                    property bool pendingDismiss: false
+                    readonly property real maxSwipe: -88
+                    readonly property real dismissThreshold: -56
+
+                    Behavior on dragX {
+                        enabled: !rowItem.dragging
+                        NumberAnimation {
+                            duration: 260
+                            easing.type: Easing.OutQuart
+                            onRunningChanged: {
+                                if (!running && rowItem.pendingDismiss) {
+                                    rowItem.pendingDismiss = false
+                                    root.deleteHistory(rowItem.modelData.id)
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.right: parent.right
+                        y: 1
+                        width: Math.max(0, -rowItem.dragX)
+                        height: 56
+                        radius: 18
+                        clip: true
+                        color: Qt.rgba(0.86, 0.26, 0.26, 1)
+                        visible: rowItem.dragX < -4
+
+                        AnimeIcon {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            kind: "trash"; sz: 15; col: "white"
+                            opacity: Math.min(1, -rowItem.dragX / -rowItem.dismissThreshold)
+                        }
+                    }
+
+                    Rectangle {
+                        GlassSheen { visible: rowItem.isCursor || rowItem.isOpen || rowMouse.containsMouse }
+                        x: rowItem.dragX
+                        y: 1
+                        width: parent.width
+                        height: 56
+                        radius: 18
+                        color: rowItem.isCursor
+                               ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.12 : 0.07)
+                               : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06)
+                                  : (rowItem.isOpen ? Qt.rgba(1, 1, 1, 0.05) : "transparent"))
+                        Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+
+                        AnimeCover {
+                            x: 8; anchors.verticalCenter: parent.verticalCenter
+                            width: 38; height: 48
+                            radius: 9
+                            source: root.coverFor(rowItem.modelData.id)
+                            label: rowItem.modelData.title
+                        }
+
+                        Column {
+                            anchors.left: parent.left; anchors.leftMargin: 56
+                            anchors.right: parent.right; anchors.rightMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 1
+
+                            Text {
+                                renderType: Text.NativeRendering
+                                width: parent.width
+                                text: rowItem.modelData.title
+                                elide: Text.ElideRight
+                                font.family: root.textFontFamily
+                                font.pixelSize: 13
+                                color: "white"
+                                opacity: rowItem.isCursor || rowItem.isOpen ? 0.95 : 0.68
+                            }
+                            Text {
+                                renderType: Text.NativeRendering
+                                visible: rowItem.modelData.ep !== ""
+                                width: parent.width
+                                text: rowItem.modelData.resume
+                                      ? "Paused: ep " + rowItem.modelData.resume.ep + " at " + root.fmtTime(rowItem.modelData.resume.pos)
+                                      : "Last watched: ep " + rowItem.modelData.ep
+                                elide: Text.ElideRight
+                                font.family: root.textFontFamily
+                                font.pixelSize: 10
+                                color: "white"
+                                opacity: 0.4
+                            }
+                        }
+                    }
+
+                    // Sits outside the moving card so the cursor position
+                    // doesn't shift while dragging (1:1 swipe).
+                    MouseArea {
+                        id: rowMouse
+                        x: 0; y: 1
+                        width: rowItem.width
+                        height: 56
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+
+                        property real pressX: 0
+                        property bool moved: false
+
+                        onPressed: function(mouse) {
+                            pressX = mouse.x
+                            moved = false
+                            rowItem.dragging = true
+                        }
+
+                        onPositionChanged: function(mouse) {
+                            if (!pressed || !rowItem.canDelete) return
+                            const delta = Math.min(0, mouse.x - pressX)
+                            if (!moved && Math.abs(delta) > 6) moved = true
+                            if (moved) rowItem.dragX = Math.max(rowItem.maxSwipe, delta)
+                        }
+
+                        onReleased: {
+                            rowItem.dragging = false
+                            if (moved) {
+                                if (rowItem.dragX <= rowItem.dismissThreshold) {
+                                    rowItem.pendingDismiss = true
+                                    rowItem.dragX = -rowItem.width
+                                } else {
+                                    rowItem.dragX = 0
+                                }
+                                root.focusInput()
+                                return
+                            }
+                            root.openRow(rowItem.index)
+                            root.focusInput()
+                        }
+
+                        onCanceled: {
+                            rowItem.dragging = false
+                            rowItem.dragX = 0
+                        }
+                    }
                 }
+            }
+
+            Text {
+                renderType: Text.NativeRendering
+                x: 6; y: 120
+                width: root.resultsWidth - 6
+                horizontalAlignment: Text.AlignHCenter
+                visible: root.listRows.length === 0
+                text: "Nothing watched yet"
+                font.family: root.textFontFamily; font.pixelSize: 12
+                color: "white"; opacity: 0.3
+            }
+
+            // thin divider between history and episodes
+            Rectangle {
+                x: root.resultsWidth + 10; y: 10
+                width: 1; height: parent.height - 20
+                color: Qt.rgba(1, 1, 1, 0.09)
+            }
+
+            // right: episodes
+            Item {
+                id: epPanel
+                x: root.resultsWidth + 18
+                width: parent.width - x - 8
+                height: parent.height
 
                 Item {
                     id: epHeader
@@ -988,8 +1275,8 @@ Item {
                     Column {
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.leftMargin: 18
-                        anchors.rightMargin: 18
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 2
 
@@ -999,8 +1286,8 @@ Item {
                             elide: Text.ElideRight
                             text: root.selectedTitle !== "" ? root.selectedTitle : "Episodes"
                             font.family: root.textFontFamily
-                            font.pixelSize: 13
-                            font.weight: Font.Medium
+                            font.pixelSize: 15
+                            font.bold: true
                             color: "white"
                             opacity: 0.95
                         }
@@ -1009,9 +1296,9 @@ Item {
                             width: parent.width
                             elide: Text.ElideRight
                             font.family: root.textFontFamily
-                            font.pixelSize: 10
+                            font.pixelSize: 11
                             color: "white"
-                            opacity: 0.32
+                            opacity: 0.4
                             text: root.selectedId === "" ? "Pick an anime on the left"
                                   : (root.loadingEps ? "Loading episodes…"
                                      : (root.episodes.length + (root.episodes.length === 1 ? " episode" : " episodes")))
@@ -1025,8 +1312,8 @@ Item {
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.margins: 6
-                    leftMargin: 4; rightMargin: 4; topMargin: 4; bottomMargin: 4   // content inset: cells stay where they were
+                    anchors.margins: 2
+                    leftMargin: 4; rightMargin: 4; topMargin: 4; bottomMargin: 4
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     cellWidth: Math.floor((width - leftMargin - rightMargin) / root.epCols)
@@ -1096,283 +1383,293 @@ Item {
             }
         }
 
-        // footer
-        Item {
-            width: parent.width
-            height: root.footerHeight
+        // The one text input. It sits in the Search tab's bar; on the other tabs it
+        // shrinks to nothing but keeps keyboard focus so every key keeps working.
+        TextInput {
+            id: searchInput
+            renderType: TextInput.NativeRendering
+            x: root.tab === "search" ? 40 : 0
+            y: 2
+            width: root.tab === "search" ? bodyArea.width - 16 - 80 : 1
+            height: 32
+            opacity: root.tab === "search" ? 1 : 0
+            color: "white"
+            font.pixelSize: 13
+            font.family: root.textFontFamily
+            verticalAlignment: TextInput.AlignVCenter
+            activeFocusOnPress: true
+            clip: true
 
-            Row {
-                id: modePills
-                visible: root.countdown <= 0      // the footer is the countdown while it runs
-                anchors.left: parent.left
-                anchors.leftMargin: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 6
-
-                Repeater {
-                    model: [ { key: "sub", label: "Sub" }, { key: "dub", label: "Dub" } ]
-                    delegate: Rectangle {
-                        GlassSheen {}
-                        required property var modelData
-                        readonly property bool active: root.mode === modelData.key
-                        width: 52; height: 26; radius: 13
-                        color: active ? Qt.rgba(1, 1, 1, 0.14) : (pillMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
-                        border.width: 1
-                        border.color: active ? Qt.rgba(1, 1, 1, 0.35) : Qt.rgba(1, 1, 1, 0.15)
-                        Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
-
-                        Text {
-                            renderType: Text.NativeRendering
-                            anchors.centerIn: parent
-                            text: modelData.label
-                            font.family: root.textFontFamily
-                            font.pixelSize: 12
-                            color: "white"
-                            opacity: parent.active ? 1.0 : 0.5
-                        }
-                        MouseArea {
-                            id: pillMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { root.mode = modelData.key; root.focusInput() }
-                        }
-                    }
+            onTextChanged: {
+                root.query = text
+                root.resultIndex = 0
+                root.zone = "results"
+                root.searchError = ""
+                if (text.length > 0 && root.tab !== "search") root.tab = "search"
+                if (text.trim().length < 2) {
+                    searchDebounce.stop()
+                    root.results = []
+                    root.searching = false
+                } else {
+                    root.searching = true
+                    searchDebounce.restart()
                 }
+            }
 
-                // Auto: play the next episode when one ends at 90%+. Green = on.
-                Rectangle {
-                    id: autoBtn
+            // keys without their own handler below (letters, backspace, ...)
+            Keys.onPressed: (event) => {
+                if (root.cancelCountdown()) event.accepted = true
+            }
+
+            Keys.onEscapePressed: {
+                if (root.cancelCountdown()) return
+                if (root.tab === "list" && root.zone === "episodes") root.zone = "results"
+                else if (root.tab === "search" && text.length > 0) text = ""
+                else if (root.tab !== "home") root.tab = "home"
+                else root.closeRequested()
+            }
+            Keys.onReturnPressed: { if (!root.cancelCountdown()) root.activate() }
+            Keys.onEnterPressed: { if (!root.cancelCountdown()) root.activate() }
+            Keys.onTabPressed: { if (!root.cancelCountdown()) root.toggleMode() }
+            Keys.onUpPressed: {
+                if (root.cancelCountdown()) return
+                if (root.tab === "search") root.moveRow(-root.searchCols)
+                else if (root.tab === "list") {
+                    if (root.zone === "results") root.moveRow(-1)
+                    else root.moveEp(-root.epCols)
+                }
+            }
+            Keys.onDownPressed: {
+                if (root.cancelCountdown()) return
+                if (root.tab === "search") root.moveRow(root.searchCols)
+                else if (root.tab === "list") {
+                    if (root.zone === "results") root.moveRow(1)
+                    else root.moveEp(root.epCols)
+                }
+            }
+            Keys.onLeftPressed: {
+                if (root.cancelCountdown()) return
+                if (root.tab === "search") root.moveRow(-1)
+                else if (root.tab === "list" && root.zone === "episodes") {
+                    if (root.epIndex % root.epCols === 0) root.zone = "results"
+                    else root.moveEp(-1)
+                }
+            }
+            Keys.onRightPressed: {
+                if (root.cancelCountdown()) return
+                if (root.tab === "search") root.moveRow(1)
+                else if (root.tab === "list") {
+                    if (root.zone === "episodes") root.moveEp(1)
+                    else if (root.episodes.length > 0) root.zone = "episodes"
+                }
+            }
+        }
+    }
+
+    // ── footer ────────────────────────────────────────────────────────────────
+    Item {
+        x: root.railWidth
+        y: root.topInset + root.panelsHeight
+        width: root.width - root.railWidth
+        height: root.footerHeight
+
+        Row {
+            id: modePills
+            visible: root.footerText === ""      // the footer shows status / the countdown while one is active
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+
+            Repeater {
+                model: [ { key: "sub", label: "Sub" }, { key: "dub", label: "Dub" } ]
+                delegate: Rectangle {
                     GlassSheen {}
-                    width: 64; height: 26; radius: 13
-                    color: root.autoplay
-                           ? Qt.rgba(0.35, 0.85, 0.5, autoMouse.containsMouse ? 0.24 : 0.16)
-                           : (autoMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
+                    required property var modelData
+                    readonly property bool active: root.mode === modelData.key
+                    width: 46; height: 26; radius: 13
+                    color: active ? Qt.rgba(1, 1, 1, 0.14) : (pillMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
                     border.width: 1
-                    border.color: root.autoplay ? Qt.rgba(0.35, 0.85, 0.5, 0.55) : Qt.rgba(1, 1, 1, 0.15)
+                    border.color: active ? Qt.rgba(1, 1, 1, 0.35) : Qt.rgba(1, 1, 1, 0.15)
                     Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
-                    Behavior on border.color { ColorAnimation { duration: IslandMotion.micro } }
 
-                    Row {
+                    Text {
+                        renderType: Text.NativeRendering
                         anchors.centerIn: parent
-                        spacing: 5
-                        Text {
-                            renderType: Text.NativeRendering
-                            text: "\uf04b"
-                            font.family: root.iconFontFamily
-                            font.pixelSize: 10
-                            color: root.autoplay ? Qt.rgba(0.45, 0.92, 0.6, 1.0) : "white"
-                            opacity: root.autoplay ? 1.0 : 0.5
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            renderType: Text.NativeRendering
-                            text: "Auto"
-                            font.family: root.textFontFamily
-                            font.pixelSize: 12
-                            color: root.autoplay ? Qt.rgba(0.45, 0.92, 0.6, 1.0) : "white"
-                            opacity: root.autoplay ? 1.0 : 0.5
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
+                        text: modelData.label
+                        font.family: root.textFontFamily
+                        font.pixelSize: 12
+                        color: "white"
+                        opacity: parent.active ? 1.0 : 0.5
                     }
-
                     MouseArea {
-                        id: autoMouse
+                        id: pillMouse
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { root.toggleAutoplay(); root.focusInput() }
-                    }
-                }
-
-                // hold to clear all history; the bar fills while you hold
-                Rectangle {
-                    id: clearBtn
-                    GlassSheen {}
-                    visible: root.history.length > 0
-                    property real hold: 0
-                    width: 72; height: 26; radius: 13
-                    color: clearMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent"
-                    border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.15)
-                    Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
-
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        width: parent.width * clearBtn.hold
-                        radius: parent.radius
-                        visible: clearBtn.hold > 0
-                        color: Qt.rgba(0.86, 0.26, 0.26, 0.6)
-                    }
-
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 5
-                        Text {
-                            renderType: Text.NativeRendering
-                            text: "\uf1f8"
-                            font.family: root.iconFontFamily
-                            font.pixelSize: 11
-                            color: "white"
-                            opacity: 0.5 + 0.5 * clearBtn.hold
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            renderType: Text.NativeRendering
-                            text: clearMouse.pressed ? "Hold…" : "Clear"
-                            font.family: root.textFontFamily
-                            font.pixelSize: 12
-                            color: "white"
-                            opacity: 0.5 + 0.5 * clearBtn.hold
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                    }
-
-                    NumberAnimation {
-                        id: holdAnim
-                        target: clearBtn
-                        property: "hold"
-                        from: 0; to: 1
-                        duration: 1200
-                        onStopped: {
-                            if (clearBtn.hold >= 1) {
-                                root.clearHistory()
-                                clearBtn.hold = 0
-                            }
-                        }
-                    }
-
-                    NumberAnimation {
-                        id: releaseAnim
-                        target: clearBtn
-                        property: "hold"
-                        to: 0
-                        duration: 180
-                    }
-
-                    MouseArea {
-                        id: clearMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onPressed: { releaseAnim.stop(); holdAnim.restart(); root.focusInput() }
-                        onReleased: { if (holdAnim.running) { holdAnim.stop(); releaseAnim.restart() } }
-                        onCanceled: { if (holdAnim.running) { holdAnim.stop(); releaseAnim.restart() } }
+                        onClicked: { root.mode = modelData.key; root.focusInput() }
                     }
                 }
             }
 
-            Text {
-                renderType: Text.NativeRendering
-                anchors.left: parent.left
-                anchors.leftMargin: root.countdown > 0 ? 14 : modePills.width + 28
-                anchors.right: actionRow.left
-                anchors.rightMargin: 14
-                anchors.verticalCenter: parent.verticalCenter
-                elide: Text.ElideRight
-                maximumLineCount: 1
-                font.family: root.textFontFamily
-                font.pixelSize: 11
-                color: root.countdown > 0 ? Qt.rgba(0.45, 0.92, 0.6, 1.0)
-                       : (root.playing ? "white"
-                          : (root.errorText !== "" ? Qt.rgba(1.0, 0.62, 0.55, 0.95) : Qt.rgba(1, 1, 1, 0.55)))
-                opacity: root.footerText !== "" ? 1.0 : 0
-                text: root.footerText
+            // Auto: play the next episode when one ends at 90%+. Green = on.
+            Rectangle {
+                id: autoBtn
+                GlassSheen {}
+                width: 60; height: 26; radius: 13
+                color: root.autoplay
+                       ? Qt.rgba(0.35, 0.85, 0.5, autoMouse.containsMouse ? 0.24 : 0.16)
+                       : (autoMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
+                border.width: 1
+                border.color: root.autoplay ? Qt.rgba(0.35, 0.85, 0.5, 0.55) : Qt.rgba(1, 1, 1, 0.15)
+                Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+                Behavior on border.color { ColorAnimation { duration: IslandMotion.micro } }
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 5
+                    AnimeIcon {
+                        kind: "play"; sz: 10
+                        col: root.autoplay ? Qt.rgba(0.45, 0.92, 0.6, 1.0) : "white"
+                        opacity: root.autoplay ? 1.0 : 0.5
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        renderType: Text.NativeRendering
+                        text: "Auto"
+                        font.family: root.textFontFamily
+                        font.pixelSize: 12
+                        color: root.autoplay ? Qt.rgba(0.45, 0.92, 0.6, 1.0) : "white"
+                        opacity: root.autoplay ? 1.0 : 0.5
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+
+                MouseArea {
+                    id: autoMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: { root.toggleAutoplay(); root.focusInput() }
+                }
             }
 
-            Row {
-                id: actionRow
-                anchors.right: parent.right
-                anchors.rightMargin: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 10
+            // hold to clear all history; the bar fills while you hold
+            Rectangle {
+                id: clearBtn
+                GlassSheen {}
+                visible: root.history.length > 0
+                property real hold: 0
+                width: 66; height: 26; radius: 13
+                color: clearMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent"
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.15)
+                Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
 
                 Rectangle {
-                    GlassSheen {}
-                    visible: root.history.length > 0 && root.countdown <= 0
-                    width: contRow.width + 20
-                    height: 28
-                    radius: 8
-                    color: contMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
-                    Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: parent.width * clearBtn.hold
+                    radius: parent.radius
+                    visible: clearBtn.hold > 0
+                    color: Qt.rgba(0.86, 0.26, 0.26, 0.6)
+                }
 
-                    Row {
-                        id: contRow
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Text {
-                            renderType: Text.NativeRendering
-                            text: "\uf1da"
-                            font.family: root.iconFontFamily
-                            font.pixelSize: 11
-                            color: "white"
-                            opacity: 0.45
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            renderType: Text.NativeRendering
-                            text: "Continue watching"
-                            font.family: root.textFontFamily
-                            font.pixelSize: 11
-                            color: "white"
-                            opacity: 0.5
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 5
+                    AnimeIcon {
+                        kind: "trash"; sz: 11; col: "white"
+                        opacity: 0.5 + 0.5 * clearBtn.hold
+                        anchors.verticalCenter: parent.verticalCenter
                     }
-                    MouseArea {
-                        id: contMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: { root.continueWatching(); root.focusInput() }
+                    Text {
+                        renderType: Text.NativeRendering
+                        text: clearMouse.pressed ? "Hold…" : "Clear"
+                        font.family: root.textFontFamily
+                        font.pixelSize: 12
+                        color: "white"
+                        opacity: 0.5 + 0.5 * clearBtn.hold
+                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
-                Rectangle {
-                    GlassSheen {}
-                    readonly property bool canPlay: root.episodes.length > 0 && !root.playing
-                    width: playRow.width + 28
-                    height: 30
-                    radius: 9
-                    color: canPlay ? (playMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(1, 1, 1, 0.13))
-                                   : Qt.rgba(1, 1, 1, 0.05)
-                    border.width: 1
-                    border.color: canPlay ? Qt.rgba(1, 1, 1, 0.24) : Qt.rgba(1, 1, 1, 0.08)
-                    Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
-
-                    Row {
-                        id: playRow
-                        anchors.centerIn: parent
-                        spacing: 7
-                        Text {
-                            renderType: Text.NativeRendering
-                            text: "\uf04b"
-                            font.family: root.iconFontFamily
-                            font.pixelSize: 10
-                            color: "white"
-                            opacity: parent.parent.canPlay ? 0.9 : 0.3
-                            anchors.verticalCenter: parent.verticalCenter
+                NumberAnimation {
+                    id: holdAnim
+                    target: clearBtn
+                    property: "hold"
+                    from: 0; to: 1
+                    duration: 1200
+                    onStopped: {
+                        if (clearBtn.hold >= 1) {
+                            root.clearHistory()
+                            clearBtn.hold = 0
                         }
-                        Text {
-                            renderType: Text.NativeRendering
-                            text: root.episodes.length > 0 ? (root.resumeHere ? "Resume ep " : "Play ep ") + root.episodes[root.epIndex] : "Play"
-                            font.family: root.textFontFamily
-                            font.pixelSize: 12
-                            color: "white"
-                            opacity: parent.parent.canPlay ? 1.0 : 0.35
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                    }
-                    MouseArea {
-                        id: playMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: parent.canPlay ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: { root.playSelected(); root.focusInput() }
                     }
                 }
+
+                NumberAnimation {
+                    id: releaseAnim
+                    target: clearBtn
+                    property: "hold"
+                    to: 0
+                    duration: 180
+                }
+
+                MouseArea {
+                    id: clearMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onPressed: { releaseAnim.stop(); holdAnim.restart(); root.focusInput() }
+                    onReleased: { if (holdAnim.running) { holdAnim.stop(); releaseAnim.restart() } }
+                    onCanceled: { if (holdAnim.running) { holdAnim.stop(); releaseAnim.restart() } }
+                }
+            }
+        }
+
+        Text {
+            renderType: Text.NativeRendering
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.right: actionRow.left
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideRight
+            maximumLineCount: 1
+            font.family: root.textFontFamily
+            font.pixelSize: 11
+            color: root.countdown > 0 ? Qt.rgba(0.45, 0.92, 0.6, 1.0)
+                   : (root.playing ? "white"
+                      : (root.errorText !== "" ? Qt.rgba(1.0, 0.62, 0.55, 0.95) : Qt.rgba(1, 1, 1, 0.55)))
+            visible: root.footerText !== ""
+            text: root.footerText
+        }
+
+        // Continue watching is always on the right; it opens the List tab on your latest show
+        Row {
+            id: actionRow
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 8
+
+            AnimeButton {
+                visible: root.history.length > 0 && root.countdown <= 0
+                label: "Continue watching"; iconKind: "clock"; labelSize: 11
+                fontFamily: root.textFontFamily
+                onClicked: { root.continueWatching(); root.focusInput() }
+            }
+
+            AnimeButton {
+                id: playBtn
+                active: root.episodes.length > 0 && !root.playing
+                primary: true
+                iconKind: "play"
+                fontFamily: root.textFontFamily
+                label: root.episodes.length > 0 ? (root.resumeHere ? "Resume ep " : "Play ep ") + root.episodes[root.epIndex] : "Play"
+                onClicked: { root.playSelected(); root.focusInput() }
             }
         }
     }

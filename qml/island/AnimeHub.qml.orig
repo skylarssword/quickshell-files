@@ -637,6 +637,7 @@ Item {
                 }
 
                 TextInput {
+                    renderType: TextInput.NativeRendering
                     id: searchInput
                     width: parent.width - 60
                     height: 30
@@ -810,14 +811,15 @@ Item {
                         Text {
                             renderType: Text.NativeRendering
                             visible: rowItem.showSection
-                            text: rowItem.modelData.section.toUpperCase()
+                            text: rowItem.modelData.section
                             font.family: root.textFontFamily
-                            font.pixelSize: 9
+			    font.weight: Font.Medium
+                            font.pixelSize: 13
                             font.letterSpacing: 1
                             color: "white"
-                            opacity: 0.25
+                            opacity: 0.95
                             x: 10
-                            y: 8
+                            y: -7
                         }
 
                         Rectangle {
@@ -844,15 +846,15 @@ Item {
                         }
 
                         Rectangle {
-                            GlassSheen { visible: rowItem.isOpen }
+                            GlassSheen { visible: rowItem.isCursor || rowItem.isOpen || rowMouse.containsMouse }
                             x: rowItem.dragX
                             y: rowItem.showSection ? 24 : 0
                             width: parent.width
                             height: 40
                             radius: 20
                             color: rowItem.isCursor
-                                   ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.18 : 0.10)
-                                   : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12)
+                                   ? Qt.rgba(1, 1, 1, root.zone === "results" ? 0.12 : 0.07)
+                                   : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06)
                                       : (rowItem.isOpen ? Qt.rgba(1, 1, 1, 0.05) : "transparent"))
                             Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
 
@@ -862,7 +864,7 @@ Item {
                                 anchors.leftMargin: 16
                                 anchors.rightMargin: 16
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 0
+                                spacing: -5
 
                                 Text {
                                     renderType: Text.NativeRendering
@@ -989,7 +991,7 @@ Item {
                         anchors.leftMargin: 18
                         anchors.rightMargin: 18
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 0
+                        spacing: 2
 
                         Text {
                             renderType: Text.NativeRendering
