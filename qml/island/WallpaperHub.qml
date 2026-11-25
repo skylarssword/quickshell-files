@@ -990,7 +990,7 @@ Item {
                 model: root.activeList.length
                 orientation: ListView.Horizontal
                 spacing: 16
-                clip: false
+                clip: true      // neighbor cards must not draw outside the hub box (sidebar launcher has no clipping capsule)
                 focus: true
 
                 highlightFollowsCurrentItem: true
