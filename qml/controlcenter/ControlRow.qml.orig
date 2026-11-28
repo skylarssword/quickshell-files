@@ -1,0 +1,78 @@
+import QtQuick
+import "../shared"
+
+Item {
+    id: root
+
+    signal clicked()
+
+    property string glyph: ""
+    property string title: ""
+    property string sub: ""
+    property bool active: false
+    property bool clickable: true
+    property string iconFontFamily: ""
+    property string textFontFamily: ""
+
+    implicitHeight: 40
+
+    Rectangle {
+        id: disc
+        width: 40
+        height: 40
+        radius: 20
+        color: root.active ? IslandMotion.textPrimary : "transparent"
+
+        Behavior on color {
+            ColorAnimation {
+                duration: 150
+            }
+        }
+
+        Text {
+            renderType: Text.NativeRendering
+            anchors.centerIn: parent
+            text: root.glyph
+            color: root.active ? IslandMotion.onLightInk : IslandMotion.textPrimary
+            font.pixelSize: 17
+            font.family: root.iconFontFamily
+        }
+    }
+
+    Column {
+        anchors.left: disc.right
+        anchors.leftMargin: 12
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 1
+
+        Text {
+            renderType: Text.NativeRendering
+            width: parent.width
+            text: root.title
+            color: IslandMotion.textPrimary
+            font.pixelSize: 14
+            font.family: root.textFontFamily
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+        }
+        Text {
+            renderType: Text.NativeRendering
+            width: parent.width
+            visible: text.length > 0
+            text: root.sub
+            color: IslandMotion.textFaint
+            font.pixelSize: 11
+            font.family: root.textFontFamily
+            font.weight: Font.Medium
+            elide: Text.ElideRight
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        enabled: root.clickable
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.clicked()
+    }
+}

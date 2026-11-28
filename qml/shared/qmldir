@@ -4,3 +4,4 @@ singleton IslandMotion 1.0 IslandMotion.qml
 singleton IslandConfiguration 1.0 IslandConfiguration.qml
 singleton Glass 1.0 Glass.qml
 GlassSheen 1.0 GlassSheen.qml
+ControlPillGroup 1.0 ControlPillGroup.qml

@@ -1,0 +1,51 @@
+import QtQuick
+import "../shared"
+
+Rectangle {
+    id: root
+
+    signal clicked()
+    signal rightClicked()
+
+    property string label: ""
+    property bool active: false
+    property int sidePadding: 12
+    property int fontSize: 12
+    property string textFontFamily: ""
+
+    implicitWidth: pillLabel.implicitWidth + sidePadding * 2
+    implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
+    radius: height / 2
+    color: active ? IslandMotion.textPrimary : "transparent"
+
+    Behavior on color {
+        ColorAnimation {
+            duration: 150
+        }
+    }
+
+    Text {
+        id: pillLabel
+        renderType: Text.NativeRendering
+        anchors.centerIn: parent
+        text: root.label
+        color: root.active ? IslandMotion.onLightInk : IslandMotion.textSecondary
+        font.pixelSize: root.fontSize
+        font.family: root.textFontFamily
+        font.weight: root.active ? Font.DemiBold : Font.Medium
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        cursorShape: Qt.PointingHandCursor
+        onClicked: function(mouse) {
+            if (mouse.button === Qt.RightButton)
+                root.rightClicked();
+            else
+                root.clicked();
+        }
+    }
+}

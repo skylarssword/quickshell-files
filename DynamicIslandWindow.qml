@@ -1945,7 +1945,7 @@ case "capturing":
                 case "search":
                     return searchLoader.item ? searchLoader.item.capsuleWidth : 500;
                 case "control_center":
-                    return 420;
+                    return controlCenterLoader.item ? controlCenterLoader.item.preferredWidth : 440;
                 case "lyrics_control_center":
                     return lyricsControlCenterLoader.item ? lyricsControlCenterLoader.item.preferredWidth : 640;
                 case "power_menu":
@@ -1959,7 +1959,7 @@ case "capturing":
                 case "expanded":
                     return 680;
                 case "bluetooth_expanded":
-                    return 400;
+                    return 360;
                 case "equalizer":
                     return 700;
                 case "notification":
@@ -2001,7 +2001,7 @@ case "info":
 case "expanded":
                     return 130;
                 case "bluetooth_expanded":
-                    return 165;
+                    return 142;
                 case "equalizer":
                     return 210;
                 case "notification":
@@ -2019,7 +2019,7 @@ case "expanded":
 case "capturing":
                     return 19;
                 case "search":
-                    return 19;
+                    return 30;
                 case "control_center":
                 case "lyrics_control_center":
                     return 34;
@@ -2032,8 +2032,9 @@ case "capturing":
                     case "info":
                     return 34;
                 case "expanded":
-                case "bluetooth_expanded":
                     return 40;
+                case "bluetooth_expanded":
+                    return 30;
                case "equalizer":
                     return 36;
                 case "notification":
@@ -2083,8 +2084,6 @@ Behavior on displayedWidth  {
                 }
             }
 Behavior on height {
-                enabled: !(controlCenterLoader.item && controlCenterLoader.item.batteryDrawerMoving)
-
                 NumberAnimation {
                     duration: mainCapsule.morphDuration
                     easing.type: IslandMotion.easeArrive

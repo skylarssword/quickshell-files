@@ -53,7 +53,7 @@ Item {
         if (!batteryAvailable) return "#5d6068";
         if (batteryPercent <= 10) return "#ff3b30";
         if (batteryPercent <= 20) return "#ffcc00";
-        return "#34c759";
+        return IslandMotion.textPrimary;
     }
 
     anchors.fill: parent
@@ -70,37 +70,44 @@ Item {
         }
     }
 
-    Column {
+    Item {
         anchors.fill: parent
-        spacing: 16
 
-        Item {
-            width: parent.width
-            height: 66
+        Text {
+            id: bluetoothIcon
+            renderType: Text.NativeRendering
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.topMargin: 2
+            width: 36
+            horizontalAlignment: Text.AlignLeft
+            text: root.iconText
+            color: IslandMotion.textPrimary
+            font.pixelSize: 30
+            font.family: root.iconFontFamily
+        }
 
-            Item {
-                id: bluetoothIcon
-                anchors.left: parent.left
+        Row {
+            id: batteryRow
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: 2
+            spacing: 8
+
+            Text {
+                renderType: Text.NativeRendering
                 anchors.verticalCenter: parent.verticalCenter
-                width: 44
-                height: 58
-
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.centerIn: parent
-                    text: root.iconText
-                    color: "#0a84ff"
-                    font.pixelSize: 34
-                    font.family: root.iconFontFamily
-                }
+                text: root.batteryAvailable ? root.batteryPercent + "%" : "--"
+                color: root.batteryAvailable ? IslandMotion.textPrimary : IslandMotion.textFaint
+                font.pixelSize: 14
+                font.family: root.textFontFamily
+                font.weight: Font.DemiBold
             }
 
             Item {
-                id: batteryIcon
-                anchors.right: parent.right
-                y: infoBlock.y + Math.round((nameLine.height - height) / 2)
                 width: 28
                 height: 14
+                anchors.verticalCenter: parent.verticalCenter
 
                 Rectangle {
                     anchors.fill: parent
@@ -125,13 +132,11 @@ Item {
                                 easing.type: Easing.OutCubic
                             }
                         }
-
                         Behavior on color {
                             ColorAnimation { duration: 160 }
                         }
                     }
                 }
-
                 Rectangle {
                     width: 2
                     height: 6
@@ -141,110 +146,87 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
-
-            Item {
-                id: infoBlock
-                anchors.left: bluetoothIcon.right
-                anchors.leftMargin: 12
-                anchors.right: batteryIcon.left
-                anchors.rightMargin: 4
-                anchors.verticalCenter: parent.verticalCenter
-                height: 44
-
-                Row {
-                    id: nameLine
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: 22
-                    spacing: 8
-
-                    Text {
-                        renderType: Text.NativeRendering
-                        width: Math.max(0, parent.width - batteryText.implicitWidth - parent.spacing)
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.deviceName
-                        color: "#ffffff"
-                        font.pixelSize: 15
-                        font.family: root.textFontFamily
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        renderType: Text.NativeRendering
-                        id: batteryText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.batteryAvailable ? root.batteryPercent + "%" : "--"
-                        color: root.batteryAvailable ? IslandMotion.textSecondary : IslandMotion.textFaint
-                        font.pixelSize: 13
-                        font.family: root.textFontFamily
-                        font.weight: Font.DemiBold
-                    }
-                }
-
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    text: "Connected"
-                    color: "#34c759"
-                    font.pixelSize: 12
-                    font.family: root.textFontFamily
-                    font.weight: Font.Medium
-                    elide: Text.ElideRight
-                }
-            }
         }
 
-        Item {
-            width: parent.width
-            height: 43
+        Column {
+            anchors.left: bluetoothIcon.right
+            anchors.leftMargin: 10
+            anchors.right: batteryRow.left
+            anchors.rightMargin: 12
+            anchors.top: parent.top
+            spacing: 3
 
             Text {
                 renderType: Text.NativeRendering
-                id: volumeLabel
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                anchors.baseline: volumeValue.baseline
-                text: "vol"
-                color: "#f5f5f7"
-                font.pixelSize: 12
+                width: parent.width
+                text: root.deviceName
+                color: IslandMotion.textPrimary
+                font.pixelSize: 16
                 font.family: root.textFontFamily
-                font.weight: Font.Medium
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
             }
-
             Text {
                 renderType: Text.NativeRendering
-                id: volumeValue
-                anchors.right: parent.right
-                anchors.rightMargin: 12
-                anchors.verticalCenter: volumeTrack.verticalCenter
-                text: root.volumeAvailable ? root.volumePercent : "--"
+                width: parent.width
+                text: "Connected"
                 color: IslandMotion.textSecondary
                 font.pixelSize: 12
                 font.family: root.textFontFamily
                 font.weight: Font.Medium
+                elide: Text.ElideRight
             }
+        }
 
+        Item {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 8
+            height: 18
+
+            Text {
+                id: volumeLabel
+                renderType: Text.NativeRendering
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Volume"
+                color: IslandMotion.textPrimary
+                font.pixelSize: 13
+                font.family: root.textFontFamily
+                font.weight: Font.DemiBold
+            }
+            Text {
+                id: volumeValue
+                renderType: Text.NativeRendering
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: 28
+                horizontalAlignment: Text.AlignRight
+                text: root.volumeAvailable ? root.volumePercent : "--"
+                color: IslandMotion.textSecondary
+                font.pixelSize: 13
+                font.family: root.textFontFamily
+                font.weight: Font.Medium
+            }
             Rectangle {
                 id: volumeTrack
                 anchors.left: volumeLabel.right
                 anchors.leftMargin: 14
                 anchors.right: volumeValue.left
                 anchors.rightMargin: 14
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 15
-                height: 8
-                radius: 4
-                color: "#2c2c2e"
+                anchors.verticalCenter: parent.verticalCenter
+                height: 18
+                radius: 9
+                color: Qt.rgba(1, 1, 1, 0.18)
 
                 Rectangle {
-                    width: root.volumeAvailable ? parent.width * (root.volumePercent / 100.0) : 0
+                    width: root.volumeAvailable && root.volumePercent > 0
+                        ? Math.max(parent.height, parent.width * (root.volumePercent / 100.0))
+                        : 0
                     height: parent.height
                     radius: parent.radius
-                    color: "#ffffff"
+                    color: IslandMotion.textPrimary
 
                     Behavior on width {
                         NumberAnimation {
@@ -253,14 +235,14 @@ Item {
                         }
                     }
                 }
-
                 MouseArea {
                     anchors.fill: parent
                     anchors.margins: -10
                     enabled: root.volumeAvailable
                     preventStealing: true
-                    onPressed: (mouse) => root._seekVolume(mouse.x)
-                    onPositionChanged: (mouse) => { if (pressed) root._seekVolume(mouse.x) }
+                    cursorShape: Qt.PointingHandCursor
+                    onPressed: (mouse) => root._seekVolume(mouse.x - 10)
+                    onPositionChanged: (mouse) => { if (pressed) root._seekVolume(mouse.x - 10) }
                 }
             }
         }

@@ -1,0 +1,45 @@
+import QtQuick
+import IslandBackend
+import "../shared"
+
+Rectangle {
+    id: root
+
+    signal toggled()
+
+    property bool on: false
+    property bool interactive: true
+
+    width: 38
+    height: 22
+    radius: 11
+    color: on ? IslandMotion.textPrimary : StyleTokens.switchOff
+
+    Behavior on color {
+        ColorAnimation {
+            duration: StyleTokens.durationFast
+        }
+    }
+
+    Rectangle {
+        width: 16
+        height: 16
+        radius: 8
+        y: 3
+        x: root.on ? 19 : 3
+        color: root.on ? IslandMotion.onLightInk : IslandMotion.textSecondary
+
+        Behavior on x {
+            NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        enabled: root.interactive
+        onClicked: root.toggled()
+    }
+}

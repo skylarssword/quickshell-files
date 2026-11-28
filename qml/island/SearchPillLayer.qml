@@ -29,26 +29,21 @@ Item {
     signal screenshotModeRequested(string mode)
     signal screenshotGalleryRequested()
 
-    readonly property int inputRowHeight: 44
-    readonly property int iconCellSize: 92        
-    readonly property int iconSize: 40             
-    readonly property int gridRowCount: 3   
-    readonly property int gridTopMargin: 10  
-    readonly property int gridSideMargin: 14
-    readonly property int gridBottomMargin: 12
+    readonly property bool hubInput: isWallpaperMode || isAnimeMode || isScreenshotMode
+    readonly property int inputRowHeight: hubInput ? 44 : 58
+    readonly property int iconCellSize: 96
+    readonly property int iconSize: 46
+    readonly property int gridRowCount: 2
+    readonly property int gridTopMargin: 0
+    readonly property int gridSideMargin: 12
+    readonly property int gridBottomMargin: 0
 
-    readonly property int minCols: 6
-    readonly property int maxCols: 10
-    readonly property int appCountForLayout: (isWallpaperMode || isScreenshotMode || isAnimeMode)
-        ? 0
-        : (filteredApps.length > 0 ? filteredApps.length : allApps.length)
     readonly property int gridCols: {
         if (isWallpaperMode) return wallpaperHubLoader.item ? wallpaperHubLoader.item.gridCols : 8
-        let need = Math.ceil(appCountForLayout / gridRowCount)
-        return Math.max(minCols, Math.min(maxCols, need))
+        return 6
     }
 
-    readonly property int footerHeight: 18    
+    readonly property int footerHeight: 54
     readonly property int appGridHeight: gridTopMargin + (iconCellSize * gridRowCount) + gridBottomMargin + footerHeight
 
     property int capsuleWidth: isAnimeMode
@@ -57,7 +52,7 @@ Item {
         ? (wallpaperHubLoader.item
             ? (wallpaperHubLoader.item.viewMode, wallpaperHubLoader.item.capsuleWidth)
             : 700)
-        : (isScreenshotMode ? 340 : Math.max(620, gridCols * iconCellSize + gridSideMargin * 2))
+        : (isScreenshotMode ? 340 : 540)
     property int capsuleHeight: isAnimeMode
         ? (animeHubLoader.item ? root.inputRowHeight + animeHubLoader.item.capsuleHeight : (inputRowHeight + 380))
         : isWallpaperMode
@@ -70,6 +65,32 @@ Item {
     readonly property bool isLoading: appCacheLoader.running
     property var filteredApps: []
     property var allApps: []
+    property int categoryIndex: 0
+
+    readonly property var categoryTabs: [
+        { label: "All", keys: [] },
+        { label: "Internet", keys: ["Network", "WebBrowser", "Email", "InstantMessaging", "Chat", "P2P"] },
+        { label: "Utilities", keys: ["Utility", "System", "Settings", "FileManager", "TerminalEmulator", "TextEditor"] },
+        { label: "Games", keys: ["Game"] },
+        { label: "Multimedia", keys: ["AudioVideo", "Audio", "Video", "Graphics", "Player", "Music"] },
+        { label: "⋯", keys: [] }
+    ]
+
+    function appInCategory(app, tabIndex) {
+        if (tabIndex <= 0) return true
+        const own = String(app.appCategories || "").split(";")
+        if (tabIndex < categoryTabs.length - 1) {
+            const keys = categoryTabs[tabIndex].keys
+            for (let i = 0; i < keys.length; i++) {
+                if (own.indexOf(keys[i]) >= 0) return true
+            }
+            return false
+        }
+        for (let t = 1; t < categoryTabs.length - 1; t++) {
+            if (appInCategory(app, t)) return false
+        }
+        return true
+    }
 
     property var favoritesSet: ({})
 
@@ -227,7 +248,8 @@ Item {
                             appName: a.name || "",
                             appExec: a.exec || "",
                             appIcon: a.icon || "",
-                            appKeys: a.keywords || ""
+                            appKeys: a.keywords || "",
+                            appCategories: a.categories || ""
                         }
                     })
                     root.appsLoaded = true
@@ -257,6 +279,7 @@ Item {
         if (visible) {
             searchInput.text = ""
             selectedIndex = 0
+            categoryIndex = 0
             loadApps()
             if (root.isWallpaperMode) wallpaperFocusTimer.restart()
             else if (root.isAnimeMode) animeFocusTimer.restart()
@@ -280,6 +303,7 @@ Item {
             let favs = []
             let rest = []
             for (let i = 0; i < allApps.length; i++) {
+                if (!appInCategory(allApps[i], categoryIndex)) continue
                 if (isFavorite(allApps[i].appExec)) favs.push(allApps[i])
                 else rest.push(allApps[i])
             }
@@ -321,16 +345,17 @@ Item {
             height: root.inputRowHeight
 
             Row {
-                anchors.centerIn: parent
-                spacing: 8
+                x: root.hubInput ? (parent.width - width) / 2 : 26
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: root.hubInput ? 8 : 12
 
                 Text {
                     renderType: Text.NativeRendering
                     text: root.isAnimeMode ? "\uf008" : (root.isCommandMode ? "\uf120" : "\uf002")
                     font.family: root.iconFontFamily
-                    font.pixelSize: 14
-                    color: root.isCommandMode ? "#a78bfa" : "white"
-                    opacity: root.isCommandMode ? 0.9 : 0.5
+                    font.pixelSize: root.hubInput ? 14 : 16
+                    color: root.hubInput ? (root.isCommandMode ? "#a78bfa" : "white") : IslandMotion.textPrimary
+                    opacity: root.hubInput ? (root.isCommandMode ? 0.9 : 0.5) : 0.85
                     anchors.verticalCenter: parent.verticalCenter
                     Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
                 }
@@ -338,10 +363,10 @@ Item {
                 TextInput {
                     id: searchInput
                     renderType: TextInput.NativeRendering
-                    width: root.capsuleWidth - 60
+                    width: root.hubInput ? root.capsuleWidth - 60 : root.capsuleWidth - 26 - 16 - 12 - 12 - 28 - 16 - (statusLabel.visible ? 140 : 0)
                     height: 38
                     color: "white"
-                    font.pixelSize: 14
+                    font.pixelSize: root.hubInput ? 14 : 15
                     font.family: root.textFontFamily
                     verticalAlignment: TextInput.AlignVCenter
                     activeFocusOnPress: true
@@ -384,8 +409,9 @@ Item {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
                         text: "Search apps or run a command…"
-                        color: "white"; opacity: 0.25
-                        font.pixelSize: 14; font.family: root.textFontFamily
+                        color: root.hubInput ? "white" : IslandMotion.textFaint
+                        opacity: root.hubInput ? 0.25 : 0.8
+                        font.pixelSize: root.hubInput ? 14 : 15; font.family: root.textFontFamily
                         visible: searchInput.text.length === 0
                     }
                 }
@@ -396,15 +422,75 @@ Item {
                     font.family: root.iconFontFamily
                     font.pixelSize: 12
                     color: "white"
-                    opacity: closeMouse.containsMouse ? 0.7 : 0.3
+                    opacity: hubCloseMouse.containsMouse ? 0.7 : 0.3
                     anchors.verticalCenter: parent.verticalCenter
-                    visible: searchInput.text.length > 0
+                    visible: root.hubInput && searchInput.text.length > 0
                     Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
                     MouseArea {
-                        id: closeMouse; anchors.fill: parent; hoverEnabled: true
+                        id: hubCloseMouse; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: { searchInput.text = ""; searchInput.forceActiveFocus() }
                     }
                 }
+            }
+
+            Rectangle {
+                id: closeButton
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                width: 28
+                height: 28
+                radius: 14
+                visible: !root.hubInput && searchInput.text.length > 0
+                color: closeMouse.pressed ? Qt.rgba(1, 1, 1, 0.16)
+                       : (closeMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0))
+                Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
+
+                Text {
+                    renderType: Text.NativeRendering
+                    anchors.centerIn: parent
+                    text: "\uf00d"
+                    font.family: root.iconFontFamily
+                    font.pixelSize: 12
+                    color: "white"
+                    opacity: closeMouse.containsMouse ? 0.9 : 0.5
+                    scale: closeMouse.pressed ? 0.78 : 1.0
+                    Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: closeMouse.pressed ? 90 : 340
+                            easing.type: closeMouse.pressed ? Easing.OutQuad : Easing.OutBack
+                            easing.overshoot: 3.2
+                        }
+                    }
+                }
+                MouseArea {
+                    id: closeMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: { searchInput.text = ""; searchInput.forceActiveFocus() }
+                }
+            }
+
+            Text {
+                id: statusLabel
+                renderType: Text.NativeRendering
+                anchors.right: closeButton.visible ? closeButton.left : parent.right
+                anchors.rightMargin: closeButton.visible ? 10 : 26
+                anchors.verticalCenter: parent.verticalCenter
+                visible: !root.isWallpaperMode && !root.isScreenshotMode && !root.isAnimeMode
+                text: {
+                    if (root.isLoading) return "Loading…"
+                    if (root.searchText.trim() === "" && Object.keys(root.favoritesSet).length === 0)
+                        return "Right-click to favorite"
+                    return root.filteredApps.length + " apps"
+                }
+                color: IslandMotion.textFaint
+                font.pixelSize: 12
+                font.family: root.textFontFamily
+                font.weight: Font.Medium
             }
         }
 
@@ -520,12 +606,11 @@ Item {
                     font.pixelSize: 11; font.family: root.textFontFamily
                 }
                 Rectangle {
-                    GlassSheen {}
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: Math.min(cmdRunLabel.implicitWidth + 32, 460)
-                    height: 36; radius: 12
+                    height: 36; radius: 18
                     color: cmdRunMouse.containsMouse
-                           ? Qt.rgba(1,1,1,0.18) : Qt.rgba(1,1,1,0.12)
+                           ? Qt.rgba(1,1,1,0.88) : IslandMotion.textPrimary
                     Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
                     scale: cmdRunMouse.pressed ? 0.97 : 1.0
                     Behavior on scale {
@@ -537,7 +622,7 @@ Item {
                         id: cmdRunLabel
                         anchors.centerIn: parent
                         text: "\uf120  " + root.searchText
-                        color: "white"; font.pixelSize: 13
+                        color: IslandMotion.onLightInk; font.pixelSize: 13
                         font.family: "monospace"; font.weight: Font.Bold
                         elide: Text.ElideRight
                         width: Math.min(implicitWidth, 430)
@@ -564,14 +649,13 @@ Item {
 
         GridView {
             id: searchGridView
-            width: parent.width
+            x: root.gridSideMargin
+            width: parent.width - root.gridSideMargin * 2
             height: root.appGridHeight - root.footerHeight
-            anchors.leftMargin: root.gridSideMargin
-            anchors.rightMargin: root.gridSideMargin
             visible: !root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode && !root.isAnimeMode
             clip: true
 
-            cellWidth: Math.floor((root.capsuleWidth - root.gridSideMargin * 2) / Math.max(1, root.gridCols))
+            cellWidth: Math.floor(width / Math.max(1, root.gridCols))
             cellHeight: root.iconCellSize
 
             model: root.filteredApps
@@ -601,26 +685,25 @@ Item {
                 property bool isSelected: root.selectedIndex === index
 
                 Rectangle {
-                    GlassSheen { visible: parent.parent.isSelected || gridAppMouse.containsMouse }
                     anchors.centerIn: parent
                     width: parent.width - 6
                     height: parent.height - 6
-                    radius: 14
-                    color: parent.isSelected
-                           ? Qt.rgba(1, 1, 1, 0.16)
-                           : (gridAppMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0))
+                    radius: 16
+                    color: gridAppMouse.pressed ? Qt.rgba(1, 1, 1, 0.16)
+                           : (parent.isSelected ? Qt.rgba(1, 1, 1, 0.12)
+                              : (gridAppMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0)))
                     Behavior on color { ColorAnimation { duration: IslandMotion.micro } }
                 }
 
                 Column {
                     anchors.centerIn: parent
-                    spacing: 4
+                    spacing: 8
 
                     Item {
                         width: root.iconSize; height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
-                        scale: parent.parent.parent.isSelected ? 1.12
-                               : (gridAppMouse.containsMouse ? 1.08 : 1.0)
+                        scale: parent.parent.parent.isSelected ? 1.1
+                               : (gridAppMouse.containsMouse ? 1.06 : 1.0)
                         Behavior on scale {
                             NumberAnimation { duration: IslandMotion.micro; easing.type: IslandMotion.easeSpring }
                         }
@@ -664,10 +747,10 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: app.appName || ""
                         color: "white"
-                        opacity: parent.parent.isSelected ? 0.95 : 0.65
-                        font.pixelSize: 9
+                        opacity: parent.parent.isSelected ? 1.0 : 0.72
+                        font.pixelSize: 12
                         font.family: root.textFontFamily
-                        font.weight: parent.parent.isSelected ? Font.Medium : Font.Normal
+                        font.weight: parent.parent.isSelected ? Font.DemiBold : Font.Medium
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
                         maximumLineCount: 1
@@ -678,6 +761,7 @@ Item {
                 MouseArea {
                     id: gridAppMouse
                     anchors.fill: parent; hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     onEntered: root.selectedIndex = index
                     onClicked: (mouse) => {
@@ -692,23 +776,27 @@ Item {
             }
         }
 
-        Text {
-            renderType: Text.NativeRendering
+        Item {
             width: parent.width
             height: root.footerHeight
             visible: !root.isCommandMode && !root.isWallpaperMode && !root.isScreenshotMode && !root.isAnimeMode
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            text: {
-                if (root.isLoading) return "Loading…"
-                if (root.searchText.trim() === "" && Object.keys(root.favoritesSet).length === 0)
-                    return "Right-click to favorite"
-                return root.filteredApps.length + " apps"
+
+            ControlPillGroup {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                model: root.categoryTabs.map(function(tab) { return tab.label })
+                currentIndex: root.searchText.trim() === "" ? root.categoryIndex : -1
+                pillHeight: 34
+                sidePadding: 13
+                fontSize: 13
+                spacing: 6
+                textFontFamily: root.textFontFamily
+                onActivated: function(index) {
+                    root.categoryIndex = index
+                    root.selectedIndex = 0
+                    root.rebuildFiltered()
+                }
             }
-            color: IslandMotion.textFaint
-            font.pixelSize: 10
-            font.family: root.textFontFamily
-            opacity: 0.85
         }
     }
 }

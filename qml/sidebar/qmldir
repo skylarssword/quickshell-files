@@ -10,7 +10,6 @@ SidebarNotifCenter 1.0 SidebarNotifCenter.qml
 SidebarNotifToast 1.0 SidebarNotifToast.qml
 SidebarControlCenterWidget 1.0 SidebarControlCenterWidget.qml
 SidebarControlCenterLayer 1.0 SidebarControlCenterLayer.qml
-SidebarSliderCard 1.0 SidebarSliderCard.qml
 SidebarPowerLayer 1.0 SidebarPowerLayer.qml
 SidebarPowerWidget 1.0 SidebarPowerWidget.qml
 SidebarSystraySection 1.0 SidebarSystraySection.qml

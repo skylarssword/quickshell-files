@@ -1,0 +1,37 @@
+import QtQuick
+import "../shared"
+
+Item {
+    id: root
+
+    signal toggled()
+
+    property string label: ""
+    property bool on: false
+    property string textFontFamily: ""
+
+    implicitHeight: 38
+
+    Text {
+        renderType: Text.NativeRendering
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        text: root.label
+        color: IslandMotion.textPrimary
+        font.pixelSize: 14
+        font.family: root.textFontFamily
+        font.weight: Font.DemiBold
+    }
+
+    ControlSwitch {
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        on: root.on
+        interactive: false
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        onClicked: root.toggled()
+    }
+}

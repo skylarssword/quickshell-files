@@ -1,0 +1,106 @@
+import QtQuick
+import "../shared"
+
+Item {
+    id: root
+
+    signal toggled()
+    signal detailRequested()
+    signal contextRequested()
+
+    property string glyph: ""
+    property string label: ""
+    property string status: ""
+    property bool active: false
+    property bool hasDetail: false
+    property bool detailOpen: false
+    property bool toggleEnabled: true
+    property string iconFontFamily: ""
+    property string textFontFamily: ""
+
+    implicitHeight: 82
+
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onClicked: root.contextRequested()
+    }
+
+    Column {
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 6
+
+        Rectangle {
+            id: disc
+            width: 46
+            height: 46
+            radius: 23
+            anchors.horizontalCenter: parent.horizontalCenter
+            color: root.active ? IslandMotion.textPrimary : "transparent"
+            opacity: root.toggleEnabled ? 1 : 0.45
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
+
+            Text {
+                renderType: Text.NativeRendering
+                anchors.centerIn: parent
+                text: root.glyph
+                color: root.active ? IslandMotion.onLightInk : IslandMotion.textPrimary
+                font.pixelSize: 18
+                font.family: root.iconFontFamily
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.toggleEnabled
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.toggled()
+            }
+        }
+
+        Item {
+            width: detailColumn.width
+            height: detailColumn.height
+            anchors.horizontalCenter: parent.horizontalCenter
+
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -4
+                enabled: root.hasDetail
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.detailRequested()
+            }
+
+            Column {
+                id: detailColumn
+                spacing: 2
+
+                Text {
+                    renderType: Text.NativeRendering
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.label
+                    color: root.active ? IslandMotion.textPrimary : IslandMotion.textSecondary
+                    font.pixelSize: 11
+                    font.family: root.textFontFamily
+                    font.weight: Font.Medium
+                }
+                Text {
+                    renderType: Text.NativeRendering
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(implicitWidth, root.width - 4)
+                    visible: text.length > 0
+                    text: root.status + (root.hasDetail ? "  ›" : "")
+                    color: root.detailOpen ? IslandMotion.textPrimary : IslandMotion.textFaint
+                    font.pixelSize: 10
+                    font.family: root.textFontFamily
+                    font.weight: Font.Medium
+                    elide: Text.ElideRight
+                }
+            }
+        }
+    }
+}

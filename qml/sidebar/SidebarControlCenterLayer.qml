@@ -6,6 +6,7 @@ import Quickshell.Bluetooth
 import Quickshell.Io
 import IslandBackend
 import "../shared"
+import "../controlcenter"
 
 PanelWindow {
     id: root
@@ -26,9 +27,6 @@ PanelWindow {
             ? Qt.rgba(walColor.r, walColor.g, walColor.b, capsuleOpacityValue * glassBodyScale)
             : Glass.bodyFill(capsuleOpacityValue * glassBodyScale))
 
-    readonly property color moduleColor:  Qt.rgba(1,1,1, gamemodeActive ? 0.03 : 0.05)
-    readonly property color moduleHover:  Qt.rgba(1,1,1, gamemodeActive ? 0.06 : 0.09)
-    readonly property color trackColor:   StyleTokens.track
     readonly property color textPrimary:  IslandMotion.textPrimary
     readonly property color textSecondary: IslandMotion.textSecondary
 
@@ -65,6 +63,8 @@ PanelWindow {
     property string currentDateLabel:  ""
     property int    batteryCapacity:   0
     property bool   isCharging:        false
+    property bool   showBatteryTime:   false
+    property string batteryTimeText:   ""
     property real   volumeLevel:       -1
     property real   brightnessLevel:   -1
 
@@ -213,6 +213,27 @@ PanelWindow {
     }
 
     Process {
+        id: batteryTimeQuery
+        property string _buf: ""
+        command: ["bash", "-c", "upower -i $(upower -e | grep BAT) | awk '/state:/ {state=$2} /time to empty:/ {h=int($4); m=int(($4-h)*60)} /time to full:/ {m=int($4); h=int(m/60); m=m%60} END {if (state==\"charging\") printf \"Full in: %dh %dm\", h, m; else printf \"Left: %dh %dm\", h, m}'"]
+        stdout: SplitParser { onRead: batteryTimeQuery._buf += data }
+        onRunningChanged: {
+            if (!running) {
+                root.batteryTimeText = batteryTimeQuery._buf.trim()
+                batteryTimeQuery._buf = ""
+            }
+        }
+    }
+    Timer {
+        id: batteryTimePollTimer
+        interval: 30000
+        running: root.popupOpen && root.showBatteryTime
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: if (!batteryTimeQuery.running) batteryTimeQuery.running = true
+    }
+    onIsChargingChanged: if (showBatteryTime && !batteryTimeQuery.running) batteryTimeQuery.running = true
+    Process {
         id: hyprsunsetExec
         command: ["bash", "-c", "pgrep -x hyprsunset > /dev/null && pkill -x hyprsunset || hyprsunset --temperature 4500 &"]
     }
@@ -272,6 +293,8 @@ PanelWindow {
             displayedVolume = localVolume
             root.wifiPanelOpen = false
             root.bluetoothPanelOpen = false
+            root.showBatteryTime = false
+            root.batteryTimeText = ""
         }
     }
 
@@ -293,9 +316,12 @@ PanelWindow {
 
     Item {
         id: card
-        width: 440
+        width: root.appearanceMenuOpen ? 480 : 440
         anchors.centerIn: parent
-        height: contentCol.implicitHeight + 24
+        height: root.appearanceMenuOpen ? 250 : 350
+
+        Behavior on width  { NumberAnimation { duration: 240; easing.type: IslandMotion.easeOut } }
+        Behavior on height { NumberAnimation { duration: 240; easing.type: IslandMotion.easeOut } }
 
         opacity: root.popupOpen ? 1 : 0
         scale:   root.popupOpen ? 1 : 0.94
@@ -312,348 +338,287 @@ PanelWindow {
         }
         GlassSheen { cornerRadius: 28 }
 
-        Column {
-            id: contentCol
-            anchors.top: parent.top; anchors.topMargin: 12
-            anchors.left: parent.left; anchors.leftMargin: 12
-            anchors.right: parent.right; anchors.rightMargin: 12
-            spacing: 12
+        Timer {
+            id: sidebarCloseTimer
+            interval: 50; repeat: false
+            onTriggered: root.close()
+        }
+
+        Item {
+            id: mainPage
+            anchors.fill: parent
+            visible: opacity > 0
+            enabled: !root.appearanceMenuOpen
+            opacity: root.appearanceMenuOpen ? 0 : 1
+
+            transform: Translate {
+                x: root.appearanceMenuOpen ? -28 : 0
+                Behavior on x { NumberAnimation { duration: 240; easing.type: IslandMotion.easeOut } }
+            }
+            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+            readonly property real sideMargin: 20
+            readonly property real columnGap: 24
+            readonly property real rightColumnWidth: 140
+            readonly property real leftColumnWidth: width - sideMargin * 2 - columnGap - rightColumnWidth
 
             Item {
-                width: parent.width; height: 28
+                width: parent.width
+                height: 52
 
                 Text {
+                    id: timeLabel
                     renderType: Text.NativeRendering
-                    anchors.left: parent.left; anchors.leftMargin: 6
+                    anchors.left: parent.left; anchors.leftMargin: mainPage.sideMargin
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.currentTime
                     color: IslandMotion.textPrimary
-                    font.pixelSize: 19; font.family: root.heroFontFamily
-                    font.weight: Font.Bold; font.letterSpacing: -0.45
+                    font.pixelSize: 26; font.family: root.heroFontFamily
+                    font.weight: Font.Medium; font.letterSpacing: -0.45
+                }
+                Text {
+                    renderType: Text.NativeRendering
+                    anchors.left: timeLabel.right; anchors.leftMargin: 10
+                    anchors.baseline: timeLabel.baseline
+                    text: root.currentDateLabel
+                    color: IslandMotion.textSecondary
+                    font.pixelSize: 13; font.family: root.textFontFamily
+                    font.weight: Font.Medium
+                }
+
+                MouseArea {
+                    anchors.fill: batteryGroup
+                    anchors.margins: -6
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.showBatteryTime = !root.showBatteryTime
                 }
 
                 Row {
-                    anchors.right: parent.right; anchors.rightMargin: 2
+                    id: batteryGroup
+                    anchors.right: parent.right; anchors.rightMargin: mainPage.sideMargin
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                    spacing: 6
 
                     Text {
                         renderType: Text.NativeRendering
-                        text: "\uf0e7"; color: "#7be17b"
-                        font.pixelSize: 11; font.family: root.iconFontFamily
+                        text: "\uf0e7"; color: IslandMotion.textPrimary
+                        font.pixelSize: 13; font.family: root.iconFontFamily
                         visible: root.isCharging
                         anchors.verticalCenter: parent.verticalCenter
                     }
-                    
-                    Item {
-                        width: 30; height: 15
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        Rectangle {
-                            anchors.fill: parent; anchors.rightMargin: 3
-                            radius: 5; color: "transparent"
-                            border.color: Qt.rgba(1,1,1,0.70); border.width: 1.5
-
-                            Rectangle {
-                                anchors { left: parent.left; top: parent.top; bottom: parent.bottom; margins: 2 }
-                                radius: 3
-                                width: Math.max(0, (parent.width - 4) * (root.batteryCapacity / 100))
-                                color: root.batteryCapacity <= 10 ? "#ff3b30"
-                                     : root.batteryCapacity <= 20 ? "#ffcc00"
-                                     : (root.isCharging ? "#7be17b" : "#ffffff")
-                                Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-                                Behavior on color { ColorAnimation { duration: 300 } }
-                            }
-                        }
-                        Rectangle {
-                            width: 3; height: 7; radius: 2
-                            color: Qt.rgba(1,1,1,0.70)
-                            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        }
-                    }
-                    
                     Text {
                         renderType: Text.NativeRendering
-                        text: root.batteryCapacity + "%"; color: "white"
-                        font.pixelSize: 12; font.family: root.textFontFamily
+                        text: (root.showBatteryTime && root.batteryTimeText.length > 0) ? root.batteryTimeText : root.batteryCapacity + "%"
+                        color: IslandMotion.textPrimary
+                        font.pixelSize: 14; font.family: root.textFontFamily
                         font.weight: Font.DemiBold
                         anchors.verticalCenter: parent.verticalCenter
                     }
-                    
-                    Rectangle {
-                        GlassSheen {}
-                        width: 26; height: 26; radius: 13
+                    Item {
+                        width: 28; height: 14
                         anchors.verticalCenter: parent.verticalCenter
-                        color: root.hyprsunsetActive ? Qt.rgba(0.9,0.66,0.29,0.25)
-                             : (sunMouse.containsMouse ? Qt.rgba(1,1,1,0.12) : Qt.rgba(1,1,1,0.08))
-                        border.color: root.hyprsunsetActive ? "#e5a84b"
-                                    : (sunMouse.containsMouse ? Qt.rgba(1,1,1,0.4) : Qt.rgba(1,1,1,0.2))
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        Behavior on border.color { ColorAnimation { duration: 150 } }
-                        Text {
-                            renderType: Text.NativeRendering; anchors.centerIn: parent
-                            text: "\uf186"; font.family: root.iconFontFamily; font.pixelSize: 13
-                            color: root.hyprsunsetActive ? "#e5a84b" : IslandMotion.textPrimary
-                        }
-                        MouseArea {
-                            id: sunMouse; anchors.fill: parent; hoverEnabled: true
-                            onClicked: {
-                                
-                                root.hyprsunsetActive = !root.hyprsunsetActive
-                                
-                                hyprsunsetExec.startDetached()
-                                
-                                hyprsunsetDelayedCheck.restart()
+
+                        Rectangle {
+                            anchors.fill: parent; anchors.rightMargin: 2
+                            radius: 4; color: "transparent"
+                            border.color: IslandMotion.textSecondary; border.width: 1
+
+                            Rectangle {
+                                anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                                anchors.margins: 2; radius: 2
+                                width: Math.max(0, (parent.width - 4) * (root.batteryCapacity / 100))
+                                color: root.batteryCapacity <= 10 ? StyleTokens.danger
+                                     : root.batteryCapacity <= 20 ? StyleTokens.warning
+                                     : IslandMotion.textPrimary
+                                Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
                             }
                         }
-                    }
-                    
-                    Rectangle {
-                        GlassSheen {}
-                        width: 26; height: 26; radius: 13
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: root.appearanceMenuOpen || appearBtnMouse.containsMouse
-                             ? Qt.rgba(1,1,1,0.18) : Qt.rgba(1,1,1,0.08)
-                        border.color: root.appearanceMenuOpen
-                                    ? Qt.rgba(1,1,1,0.4)
-                                    : (appearBtnMouse.containsMouse ? Qt.rgba(1,1,1,0.3) : Qt.rgba(1,1,1,0.2))
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        Behavior on border.color { ColorAnimation { duration: 150 } }
-                        Text {
-                            renderType: Text.NativeRendering; anchors.centerIn: parent
-                            text: "\uf1fc"; font.family: root.iconFontFamily; font.pixelSize: 13
-                            color: root.appearanceMenuOpen ? "white" : IslandMotion.textPrimary
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-                        MouseArea {
-                            id: appearBtnMouse; anchors.fill: parent; hoverEnabled: true
-                            onClicked: root.appearanceMenuOpen = !root.appearanceMenuOpen
+                        Rectangle {
+                            width: 2; height: 6; radius: 1
+                            color: IslandMotion.textSecondary
+                            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                         }
                     }
                 }
             }
 
             Row {
-                width: parent.width; height: 80; spacing: 12
+                id: toggleRow
+                x: mainPage.sideMargin
+                y: 52
+                width: parent.width - mainPage.sideMargin * 2
 
-                Rectangle {
-                    GlassSheen {}
-                    width: (parent.width - 12) / 2; height: parent.height; radius: 20
-                    color: (wifiHover.containsMouse || root.wifiPanelOpen) ? root.moduleHover : root.moduleColor
-                    border.width: 1
-                    border.color: root.wifiPanelOpen ? Qt.rgba(1,1,1,0.35) : Qt.rgba(1,1,1,0.16)
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                    MouseArea {
-                        id: wifiHover; anchors.fill: parent; hoverEnabled: true
-                        onClicked: {
-                            root.wifiPanelOpen = !root.wifiPanelOpen
-                            root.bluetoothPanelOpen = false
-                            if (root.wifiPanelOpen && root.wifiController)
-                                root.wifiController.refreshNetworks(true)
-                        }
-                    }
-                    Text {
-                        renderType: Text.NativeRendering
-                        anchors.left: parent.left; anchors.leftMargin: 14
-                        anchors.top: parent.top; anchors.topMargin: 12
-                        text: root.wifiGlyph; font.family: root.iconFontFamily; font.pixelSize: 18
-                        color: root.wifiEnabled ? StyleTokens.accent : IslandMotion.textFaint
-                    }
-                    Rectangle {
-                        anchors.right: parent.right; anchors.rightMargin: 12
-                        anchors.top: parent.top; anchors.topMargin: 12
-                        width: 34; height: 20; radius: 10
-                        color: root.wifiEnabled ? StyleTokens.success : StyleTokens.switchOff
-                        Behavior on color { ColorAnimation { duration: 140 } }
-                        Rectangle {
-                            width: 16; height: 16; radius: 8; y: 2
-                            x: root.wifiEnabled ? 16 : 2; color: "white"
-                            Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            enabled: root.wifiSupported && root.wifiAvailable && !root.wifiBusy
-                            onClicked: root.toggleWifiEnabled()
-                        }
-                    }
-                    Column {
-                        anchors.left: parent.left; anchors.leftMargin: 14
-                        anchors.bottom: parent.bottom; anchors.bottomMargin: 10
-                        spacing: 2
-                        Text {
-                            renderType: Text.NativeRendering; text: "Wi-Fi"
-                            color: IslandMotion.textPrimary; font.pixelSize: 13
-                            font.family: root.textFontFamily; font.weight: Font.DemiBold
-                        }
-                        Text {
-                            renderType: Text.NativeRendering; text: root.wifiStatusText
-                            color: IslandMotion.textFaint; font.pixelSize: 10
-                            font.family: root.textFontFamily
-                        }
+                ControlToggle {
+                    width: toggleRow.width / 4
+                    glyph: root.wifiGlyph.length > 0 ? root.wifiGlyph : "\uf1eb"
+                    label: "Wi-Fi"
+                    status: root.wifiEnabled && root.wifiCurrentSsid.length > 0 ? root.wifiCurrentSsid : root.wifiStatusText
+                    active: root.wifiEnabled
+                    hasDetail: true
+                    detailOpen: root.wifiPanelOpen
+                    toggleEnabled: root.wifiSupported && root.wifiAvailable && !root.wifiBusy
+                    iconFontFamily: root.iconFontFamily
+                    textFontFamily: root.textFontFamily
+                    onToggled: root.toggleWifiEnabled()
+                    onDetailRequested: {
+                        root.wifiPanelOpen = !root.wifiPanelOpen
+                        root.bluetoothPanelOpen = false
+                        if (root.wifiPanelOpen && root.wifiController)
+                            root.wifiController.refreshNetworks(true)
                     }
                 }
-
-                Rectangle {
-                    GlassSheen {}
-                    width: (parent.width - 12) / 2; height: parent.height; radius: 20
-                    color: (btHover.containsMouse || root.bluetoothPanelOpen) ? root.moduleHover : root.moduleColor
-                    border.width: 1
-                    border.color: root.bluetoothPanelOpen ? Qt.rgba(1,1,1,0.35) : Qt.rgba(1,1,1,0.16)
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                    MouseArea {
-                        id: btHover; anchors.fill: parent; hoverEnabled: true
-                        onClicked: {
-                            root.bluetoothPanelOpen = !root.bluetoothPanelOpen
-                            root.wifiPanelOpen = false
-                            if (root.bluetoothPanelOpen && root.bluetoothAdapter)
-                                root.bluetoothAdapter.discovering = true
-                        }
+                ControlToggle {
+                    width: toggleRow.width / 4
+                    glyph: root.bluetoothGlyph.length > 0 ? root.bluetoothGlyph : "\uf294"
+                    label: "Bluetooth"
+                    status: root.buildBluetoothStatusText()
+                    active: root.bluetoothEnabled
+                    hasDetail: true
+                    detailOpen: root.bluetoothPanelOpen
+                    toggleEnabled: root.bluetoothAvailable && !root.bluetoothBusy
+                    iconFontFamily: root.iconFontFamily
+                    textFontFamily: root.textFontFamily
+                    onToggled: root.toggleBluetoothEnabled()
+                    onDetailRequested: {
+                        root.bluetoothPanelOpen = !root.bluetoothPanelOpen
+                        root.wifiPanelOpen = false
+                        if (root.bluetoothPanelOpen && root.bluetoothAdapter)
+                            root.bluetoothAdapter.discovering = true
                     }
-                    Text {
-                        renderType: Text.NativeRendering
-                        anchors.left: parent.left; anchors.leftMargin: 14
-                        anchors.top: parent.top; anchors.topMargin: 12
-                        text: root.bluetoothGlyph; font.family: root.iconFontFamily; font.pixelSize: 18
-                        color: root.bluetoothEnabled ? StyleTokens.accent : IslandMotion.textFaint
+                }
+                ControlToggle {
+                    width: toggleRow.width / 4
+                    glyph: "\uf186"
+                    label: "Night Light"
+                    active: root.hyprsunsetActive
+                    iconFontFamily: root.iconFontFamily
+                    textFontFamily: root.textFontFamily
+                    onToggled: {
+                        root.hyprsunsetActive = !root.hyprsunsetActive
+                        hyprsunsetExec.startDetached()
+                        hyprsunsetDelayedCheck.restart()
                     }
-                    Rectangle {
-                        anchors.right: parent.right; anchors.rightMargin: 12
-                        anchors.top: parent.top; anchors.topMargin: 12
-                        width: 34; height: 20; radius: 10
-                        color: root.bluetoothEnabled ? StyleTokens.success : StyleTokens.switchOff
-                        Behavior on color { ColorAnimation { duration: 140 } }
-                        Rectangle {
-                            width: 16; height: 16; radius: 8; y: 2
-                            x: root.bluetoothEnabled ? 16 : 2; color: "white"
-                            Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            enabled: root.bluetoothAvailable && !root.bluetoothBusy
-                            onClicked: root.toggleBluetoothEnabled()
-                        }
-                    }
-                    Column {
-                        anchors.left: parent.left; anchors.leftMargin: 14
-                        anchors.bottom: parent.bottom; anchors.bottomMargin: 10
-                        spacing: 2
-                        Text {
-                            renderType: Text.NativeRendering; text: "Bluetooth"
-                            color: IslandMotion.textPrimary; font.pixelSize: 13
-                            font.family: root.textFontFamily; font.weight: Font.DemiBold
-                        }
-                        Text {
-                            renderType: Text.NativeRendering; text: root.buildBluetoothStatusText()
-                            color: IslandMotion.textFaint; font.pixelSize: 10
-                            font.family: root.textFontFamily
-                        }
-                    }
+                }
+                ControlToggle {
+                    width: toggleRow.width / 4
+                    glyph: "\uf1fc"
+                    label: "Appearance"
+                    active: root.appearanceMenuOpen
+                    iconFontFamily: root.iconFontFamily
+                    textFontFamily: root.textFontFamily
+                    onToggled: root.appearanceMenuOpen = true
                 }
             }
 
             Rectangle {
-                GlassSheen {}
-                width: parent.width; height: 56; radius: 20
-                color: gamemodeHover.containsMouse ? root.moduleHover : root.moduleColor
-                border.width: 1; border.color: Qt.rgba(1,1,1,0.16)
-                Behavior on color { ColorAnimation { duration: 120 } }
-                MouseArea { id: gamemodeHover; anchors.fill: parent; hoverEnabled: true }
+                x: mainPage.sideMargin
+                y: 146
+                width: parent.width - mainPage.sideMargin * 2
+                height: 1
+                color: IslandMotion.hairlineColor
+            }
 
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.left: parent.left; anchors.leftMargin: 14
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "\uf11b"; font.family: root.iconFontFamily; font.pixelSize: 18
-                    color: root.gamemodeActive ? "#60a5fa" : IslandMotion.textFaint
-                    Behavior on color { ColorAnimation { duration: 200 } }
-                }
+            Column {
+                x: mainPage.sideMargin
+                y: 162
+                width: mainPage.leftColumnWidth
 
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.left: parent.left; anchors.leftMargin: 44
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Game Mode"
-                    color: IslandMotion.textPrimary; font.pixelSize: 13
-                    font.family: root.textFontFamily; font.weight: Font.DemiBold
-                }
+                Item {
+                    width: parent.width
+                    height: 84
 
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.left: parent.left; anchors.leftMargin: 44
-                    anchors.bottom: parent.bottom; anchors.bottomMargin: 9
-                    text: root.gamemodeActive ? "Sidebar blacked out" : "Normal mode"
-                    color: IslandMotion.textFaint; font.pixelSize: 10
-                    font.family: root.textFontFamily
-                }
-
-                Rectangle {
-                    anchors.right: parent.right; anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 34; height: 20; radius: 10
-                    color: root.gamemodeActive ? StyleTokens.success : StyleTokens.switchOff
-                    Behavior on color { ColorAnimation { duration: 200 } }
-                    Rectangle {
-                        width: 16; height: 16; radius: 8; y: 2
-                        x: root.gamemodeActive ? 16 : 2; color: "white"
-                        Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                    ControlRow {
+                        width: parent.width
+                        glyph: root.brightnessGlyph
+                        title: "Display"
+                        sub: Math.round(root.displayedBrightness * 100) + "%"
+                        clickable: false
+                        iconFontFamily: root.iconFontFamily
+                        textFontFamily: root.textFontFamily
                     }
-                    MouseArea {
-                        anchors.fill: parent
+                    ControlTrack {
+                        id: brightnessSliderCard
+                        y: 52
+                        width: parent.width
+                        value: root.displayedBrightness
+                        onInteractionStarted: {
+                            if (root.sliderIntroPending) {
+                                sliderIntroTimer.stop(); root.sliderIntroPending = false
+                                root.displayedBrightness = root.localBrightness
+                                root.displayedVolume = root.localVolume
+                            }
+                        }
+                        onValueMoved: function(v) { root.queueBrightness(v) }
+                        onCommitRequested: { brightnessApplyTimer.stop(); root.flushBrightness(true) }
+                        onCancelRequested: SystemServices.requestBrightness()
+                    }
+                }
+
+                Item {
+                    width: parent.width
+                    height: 84
+
+                    ControlRow {
+                        width: parent.width
+                        glyph: root.volumeGlyph
+                        title: "Sound"
+                        sub: Math.round(root.displayedVolume * 100) + "%"
+                        clickable: false
+                        iconFontFamily: root.iconFontFamily
+                        textFontFamily: root.textFontFamily
+                    }
+                    ControlTrack {
+                        id: volumeSliderCard
+                        y: 52
+                        width: parent.width
+                        value: root.displayedVolume
+                        onInteractionStarted: {
+                            if (root.sliderIntroPending) {
+                                sliderIntroTimer.stop(); root.sliderIntroPending = false
+                                root.displayedBrightness = root.localBrightness
+                                root.displayedVolume = root.localVolume
+                            }
+                        }
+                        onValueMoved: function(v) { root.queueVolume(v) }
+                        onCommitRequested: { volumeApplyTimer.stop(); root.flushVolume(true) }
+                        onCancelRequested: SystemServices.requestVolume()
+                    }
+                }
+            }
+
+            Column {
+                x: mainPage.sideMargin + mainPage.leftColumnWidth + mainPage.columnGap
+                y: 162
+                width: mainPage.rightColumnWidth
+
+                Item {
+                    width: parent.width
+                    height: 84
+
+                    ControlRow {
+                        width: parent.width
+                        glyph: "\uf11b"
+                        title: "Game Mode"
+                        sub: root.gamemodeActive ? "Blacked out" : "Normal mode"
+                        active: root.gamemodeActive
+                        iconFontFamily: root.iconFontFamily
+                        textFontFamily: root.textFontFamily
                         onClicked: root.gamemodeToggleRequested()
                     }
                 }
-            }
 
-            Rectangle {
-                GlassSheen {}
-                width: parent.width; height: 56; radius: 20
-                color: sidebarHover.containsMouse ? root.moduleHover : root.moduleColor
-                border.width: 1; border.color: Qt.rgba(1,1,1,0.16)
-                Behavior on color { ColorAnimation { duration: 120 } }
-                MouseArea { id: sidebarHover; anchors.fill: parent; hoverEnabled: true }
+                Item {
+                    width: parent.width
+                    height: 84
 
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.left: parent.left; anchors.leftMargin: 14
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "\uf0c9"; font.family: root.iconFontFamily; font.pixelSize: 18
-                    color: root.sidebarEnabled ? StyleTokens.accent : IslandMotion.textFaint
-                    Behavior on color { ColorAnimation { duration: 200 } }
-                }
-
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.left: parent.left; anchors.leftMargin: 44
-                    anchors.top: parent.top; anchors.topMargin: 10
-                    text: "Sidebar"
-                    color: IslandMotion.textPrimary; font.pixelSize: 13
-                    font.family: root.textFontFamily; font.weight: Font.DemiBold
-                }
-
-                Text {
-                    renderType: Text.NativeRendering
-                    anchors.left: parent.left; anchors.leftMargin: 44
-                    anchors.bottom: parent.bottom; anchors.bottomMargin: 9
-                    text: "Tap to hide sidebar"
-                    color: IslandMotion.textFaint; font.pixelSize: 10
-                    font.family: root.textFontFamily
-                }
-
-                Rectangle {
-                    anchors.right: parent.right; anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 34; height: 20; radius: 10
-                    color: root.sidebarEnabled ? StyleTokens.success : StyleTokens.switchOff
-                    Behavior on color { ColorAnimation { duration: 200 } }
-                    Rectangle {
-                        width: 16; height: 16; radius: 8; y: 2
-                        x: root.sidebarEnabled ? 16 : 2; color: "white"
-                        Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                    }
-                    MouseArea {
-                        anchors.fill: parent
+                    ControlRow {
+                        width: parent.width
+                        glyph: "\uf0c9"
+                        title: "Sidebar"
+                        sub: "Tap to switch"
+                        active: root.sidebarEnabled
+                        iconFontFamily: root.iconFontFamily
+                        textFontFamily: root.textFontFamily
                         onClicked: {
                             root.sidebarToggleRequested()
                             sidebarCloseTimer.start()
@@ -661,408 +626,231 @@ PanelWindow {
                     }
                 }
             }
+        }
 
-            Timer {
-                id: sidebarCloseTimer
-                interval: 50; repeat: false
-                onTriggered: root.close()
-            }
+        Item {
+            id: appearancePage
+            anchors.fill: parent
+            visible: opacity > 0
+            enabled: root.appearanceMenuOpen
+            opacity: root.appearanceMenuOpen ? 1 : 0
 
-            SidebarSliderCard {
-                id: brightnessSliderCard
-                visible: !root.appearanceMenuOpen
-                opacity: root.appearanceMenuOpen ? 0 : 1
-                Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                width: parent.width; height: 76
-                title: "Display"; iconText: root.brightnessGlyph
-                iconFontFamily: root.iconFontFamily; textFontFamily: root.textFontFamily
-                value: root.displayedBrightness
-                moduleColor: root.moduleColor; moduleHover: root.moduleHover
-                trackColor: root.trackColor
-                textPrimary: root.textPrimary; textSecondary: root.textSecondary
-                onInteractionStarted: {
-                    if (root.sliderIntroPending) {
-                        sliderIntroTimer.stop(); root.sliderIntroPending = false
-                        root.displayedBrightness = root.localBrightness
-                        root.displayedVolume = root.localVolume
-                    }
-                }
-                onValueMoved: function(v) { root.queueBrightness(v) }
-                onCommitRequested: { brightnessApplyTimer.stop(); root.flushBrightness(true) }
-                onCancelRequested: SystemServices.requestBrightness()
+            transform: Translate {
+                x: root.appearanceMenuOpen ? 0 : 28
+                Behavior on x { NumberAnimation { duration: 240; easing.type: IslandMotion.easeOut } }
             }
+            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
-            SidebarSliderCard {
-                id: volumeSliderCard
-                visible: !root.appearanceMenuOpen
-                opacity: root.appearanceMenuOpen ? 0 : 1
-                Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                width: parent.width; height: 76
-                title: "Sound"; iconText: root.volumeGlyph
-                iconFontFamily: root.iconFontFamily; textFontFamily: root.textFontFamily
-                value: root.displayedVolume
-                moduleColor: root.moduleColor; moduleHover: root.moduleHover
-                trackColor: root.trackColor
-                textPrimary: root.textPrimary; textSecondary: root.textSecondary
-                onInteractionStarted: {
-                    if (root.sliderIntroPending) {
-                        sliderIntroTimer.stop(); root.sliderIntroPending = false
-                        root.displayedBrightness = root.localBrightness
-                        root.displayedVolume = root.localVolume
-                    }
-                }
-                onValueMoved: function(v) { root.queueVolume(v) }
-                onCommitRequested: { volumeApplyTimer.stop(); root.flushVolume(true) }
-                onCancelRequested: SystemServices.requestVolume()
-            }
+            readonly property real sideMargin: 20
+            readonly property real columnGap: 24
+            readonly property real columnWidth: (width - sideMargin * 2 - columnGap) / 2
 
             Item {
-                id: appearanceMenuDrawer
                 width: parent.width
-                height: root.appearanceMenuOpen ? appearanceMenuContent.implicitHeight + 12 : 0
-                Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                height: 52
 
-                // clip area is 4px larger than the drawer on the left, right and top so the card's outer glass edge isn't cut off
-                Item {
-                    id: appearanceMenuClip
-                    x: -4; y: -4
-                    width: parent.width + 8; height: parent.height + 4
-                    clip: true
+                Text {
+                    id: backGlyph
+                    renderType: Text.NativeRendering
+                    anchors.left: parent.left; anchors.leftMargin: appearancePage.sideMargin
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "\uf053"; color: IslandMotion.textPrimary
+                    font.pixelSize: 15; font.family: root.iconFontFamily
+                }
+                Text {
+                    renderType: Text.NativeRendering
+                    anchors.left: backGlyph.right; anchors.leftMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Appearance"; color: IslandMotion.textPrimary
+                    font.pixelSize: 20; font.family: root.heroFontFamily
+                    font.weight: Font.Medium
+                }
+                MouseArea {
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 150; height: parent.height
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.appearanceMenuOpen = false
+                }
+            }
+
+            Column {
+                x: appearancePage.sideMargin
+                y: 60
+                width: appearancePage.columnWidth
+
+                ControlSwitchRow {
+                    width: parent.width
+                    label: "Pywal"
+                    on: root.capsuleUseWalColor
+                    textFontFamily: root.textFontFamily
+                    onToggled: root.appearanceWalColorToggleRequested(!root.capsuleUseWalColor)
+                }
+
+                Item { width: 1; height: 12 }
+
                 Rectangle {
-                    GlassSheen {}
-                    id: appearanceMenuContent
-                    anchors.top: parent.top; anchors.topMargin: 4
-                    anchors.left: parent.left; anchors.leftMargin: 4
-                    anchors.right: parent.right; anchors.rightMargin: 4
-                    implicitHeight: appearanceColumn.implicitHeight + 28
-                    radius: 20
-                    color: Qt.rgba(1,1,1,0.05)
-                    border.width: 1
-                    border.color: Qt.rgba(1,1,1,0.16)
+                    width: parent.width; height: 36; radius: 12
+                    color: root.capsuleUseWalColor
+                         ? Qt.rgba(root.capsuleWalColor.r, root.capsuleWalColor.g, root.capsuleWalColor.b, root.capsuleOpacityValue)
+                         : Qt.rgba(0, 0, 0, root.capsuleOpacityValue)
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
-                    Column {
-                        id: appearanceColumn
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.margins: 14
-                        spacing: 10
+                    Text {
+                        renderType: Text.NativeRendering
+                        anchors.centerIn: parent
+                        text: "Preview"; color: IslandMotion.textPrimary; opacity: 0.7
+                        font.pixelSize: 12; font.family: root.textFontFamily
+                        font.weight: Font.Medium
+                    }
+                }
 
-                        Item {
-                            width: parent.width
-                            height: 24
+                Item {
+                    width: parent.width
+                    height: root.capsuleUseWalColor && root.capsuleWalColors.length > 0 ? 40 : 0
+                    clip: true
+                    Behavior on height { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
-                            Text {
-                                renderType: Text.NativeRendering
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Appearance"
-                                color: root.textPrimary
-                                font.pixelSize: 13
-                                font.family: root.textFontFamily
-                                font.weight: Font.DemiBold
-                            }
+                    ListView {
+                        anchors.fill: parent
+                        anchors.topMargin: 10
+                        orientation: ListView.Horizontal
+                        spacing: 4
+                        interactive: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        model: root.capsuleWalColors.length
 
-                            Row {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 6
-
-                                Text {
-                                    renderType: Text.NativeRendering
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "Pywal"
-                                    color: root.textSecondary
-                                    font.pixelSize: 10
-                                    font.family: root.textFontFamily
-                                    font.weight: Font.Medium
-                                }
-
-                                Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 34; height: 20; radius: 10
-                                    color: root.capsuleUseWalColor ? StyleTokens.success : StyleTokens.switchOff
-                                    Behavior on color { ColorAnimation { duration: 140 } }
-                                    Rectangle {
-                                        width: 16; height: 16; radius: 8; y: 2
-                                        x: root.capsuleUseWalColor ? 16 : 2; color: "white"
-                                        Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                                    }
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: root.appearanceWalColorToggleRequested(!root.capsuleUseWalColor)
-                                    }
-                                }
-                            }
+                        ScrollBar.horizontal: ScrollBar {
+                            policy: ScrollBar.AsNeeded; height: 4
+                            contentItem: Rectangle { implicitHeight: 4; radius: 2; color: Qt.rgba(1,1,1,0.25) }
+                            background: Item {}
                         }
 
-                        Rectangle {
-                            width: parent.width; height: 40; radius: 14
-                            border.width: 1; border.color: Qt.rgba(1,1,1,0.15)
-                            color: root.capsuleUseWalColor
-                                 ? Qt.rgba(root.capsuleWalColor.r, root.capsuleWalColor.g, root.capsuleWalColor.b, root.capsuleOpacityValue)
-                                 : Qt.rgba(0, 0, 0, root.capsuleOpacityValue)
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                            Text {
-                                renderType: Text.NativeRendering
+                        delegate: Item {
+                            id: swatchDelegate
+                            required property int index
+                            readonly property bool isActive: root.capsuleWalColorIndex === index
+                            width: 26; height: 26
+
+                            Rectangle {
                                 anchors.centerIn: parent
-                                text: "Preview"
-                                color: "white"; opacity: 0.55
-                                font.pixelSize: 10; font.family: root.textFontFamily
-                                font.weight: Font.Medium
-                            }
-                        }
+                                width: swatchDelegate.isActive ? 26 : 22
+                                height: width; radius: width / 2
+                                color: root.capsuleWalColors[swatchDelegate.index] || "#000000"
+                                scale: swatchArea.containsMouse ? 1.14 : 1.0
+                                Behavior on width { NumberAnimation { duration: 120 } }
+                                Behavior on scale { NumberAnimation { duration: 140; easing.type: IslandMotion.easeSpring } }
 
-                        Item {
-                            width: parent.width
-                            height: root.capsuleUseWalColor && root.capsuleWalColors.length > 0 ? 40 : 0
-                            clip: true
-                            Behavior on height { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-
-                            ListView {
-                                anchors.fill: parent
-                                anchors.bottomMargin: 8
-                                orientation: ListView.Horizontal
-                                spacing: 6
-                                clip: true
-                                interactive: true
-                                boundsBehavior: Flickable.StopAtBounds
-                                model: root.capsuleWalColors.length
-                                readonly property real contentNaturalWidth: count > 0
-                                    ? (count * 26 + Math.max(0, count - 1) * spacing) : 0
-                                leftMargin:  Math.max(0, (width - contentNaturalWidth) / 2)
-                                rightMargin: Math.max(0, (width - contentNaturalWidth) / 2)
-
-                                ScrollBar.horizontal: ScrollBar {
-                                    policy: ScrollBar.AsNeeded; height: 4
-                                    contentItem: Rectangle { implicitHeight: 4; radius: 2; color: Qt.rgba(1,1,1,0.25) }
-                                    background: Item {}
-                                }
-
-                                delegate: Rectangle {
-                                    id: swatchDelegate
-                                    required property int index
-                                    readonly property bool isActive: root.capsuleWalColorIndex === index
-                                    width: 26; height: 26; radius: 13
-                                    anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-                                    color: root.capsuleWalColors[index] || "#000000"
-                                    border.width: isActive ? 2 : 1
-                                    border.color: isActive ? "white" : Qt.rgba(1,1,1,0.25)
-                                    scale: isActive ? 1.12 : (swatchMouse.containsMouse ? 1.06 : 1.0)
-                                    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
-                                    Behavior on border.color { ColorAnimation { duration: 120 } }
-
-                                    Text {
-                                        renderType: Text.NativeRendering; anchors.centerIn: parent
-                                        text: swatchDelegate.index; color: "white"
-                                        font.pixelSize: 8; font.weight: Font.Bold
-                                        font.family: root.textFontFamily
-                                        style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.65)
-                                    }
-
-                                    MouseArea {
-                                        id: swatchMouse; anchors.fill: parent
-                                        hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                        onClicked: root.appearanceWalColorIndexRequested(swatchDelegate.index)
-                                    }
-                                }
-                            }
-                        }
-
-                        Row {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            spacing: 6
-
-                            Repeater {
-                                model: [0.20, 0.40, 0.60, 0.80, 1.0]
-                                delegate: Rectangle {
-                                    GlassSheen {}
-                                    required property real modelData
-                                    readonly property bool isActive: Math.abs(root.capsuleOpacityValue - modelData) < 0.01
-                                    width: presetLbl.implicitWidth + 16; height: 26; radius: 13
-                                    color: isActive ? Qt.rgba(1,1,1,0.20)
-                                         : (presetMouse2.containsMouse ? Qt.rgba(1,1,1,0.12) : Qt.rgba(1,1,1,0.06))
-                                    border.color: isActive ? Qt.rgba(1,1,1,0.4) : Qt.rgba(1,1,1,0.12)
-                                    border.width: 1
-                                    Behavior on color { ColorAnimation { duration: 120 } }
-
-                                    Text {
-                                        renderType: Text.NativeRendering
-                                        id: presetLbl; anchors.centerIn: parent
-                                        text: Math.round(parent.modelData * 100) + "%"
-                                        color: "white"
-                                        opacity: parent.isActive ? 0.95 : 0.55
-                                        font.pixelSize: 10; font.family: root.textFontFamily
-                                        font.weight: parent.isActive ? Font.DemiBold : Font.Medium
-                                    }
-
-                                    MouseArea {
-                                        id: presetMouse2; anchors.fill: parent; hoverEnabled: true
-                                        onClicked: root.appearanceOpacityRequested(parent.modelData)
-                                    }
-                                }
-                            }
-                        }
-
-                        Item { width: parent.width; height: 1
-                            Rectangle { anchors.fill: parent; color: Qt.rgba(1,1,1,0.10) }
-                        }
-
-                        Item {
-                            width: parent.width; height: 24
-                            Text {
-                                renderType: Text.NativeRendering
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Dock"
-                                color: root.textPrimary
-                                font.pixelSize: 13; font.family: root.textFontFamily
-                                font.weight: Font.DemiBold
-                            }
-                            Row {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 6
                                 Text {
                                     renderType: Text.NativeRendering
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "Enable"
-                                    color: root.textSecondary
-                                    font.pixelSize: 10; font.family: root.textFontFamily
+                                    anchors.centerIn: parent
+                                    visible: swatchDelegate.isActive
+                                    text: swatchDelegate.index; color: "white"
+                                    font.pixelSize: 11; font.family: root.textFontFamily
                                     font.weight: Font.Medium
                                 }
-                                Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 34; height: 20; radius: 10
-                                    color: root.dockEnabled ? StyleTokens.success : StyleTokens.switchOff
-                                    Behavior on color { ColorAnimation { duration: StyleTokens.durationFast } }
-                                    Rectangle {
-                                        width: 16; height: 16; radius: 8; y: 2
-                                        x: root.dockEnabled ? 16 : 2
-                                        color: StyleTokens.white
-                                        Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                                    }
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: root.dockEnabledToggleRequested()
-                                    }
-                                }
                             }
-                        }
-
-                        Grid {
-                            width: parent.width
-                            columns: 2; rowSpacing: 6; columnSpacing: 6
-                            visible: root.dockEnabled
-                            opacity: root.dockEnabled ? 1 : 0
-                            Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                            Rectangle {
-                                GlassSheen {}
-                                width: (parent.width - 6) / 2; height: 36; radius: 12
-                                color: root.dockEnabled && root.dockMode === "pin"
-                                    ? Qt.rgba(1,1,1,0.15)
-                                    : (sbPinMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
-                                border.color: root.dockEnabled && root.dockMode === "pin"
-                                    ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
-                                border.width: 1
-                                Behavior on color        { ColorAnimation { duration: 150 } }
-                                Behavior on border.color { ColorAnimation { duration: 150 } }
-                                Text {
-                                    renderType: Text.NativeRendering; anchors.centerIn: parent
-                                    text: "Pin"
-                                    color: (root.dockEnabled && root.dockMode === "pin") ? "white" : Qt.rgba(1,1,1,0.45)
-                                    font.pixelSize: 12; font.family: root.textFontFamily
-                                    font.weight: (root.dockEnabled && root.dockMode === "pin") ? Font.DemiBold : Font.Normal
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                MouseArea {
-                                    id: sbPinMouse; anchors.fill: parent
-                                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.dockModeChangeRequested("pin")
-                                }
-                            }
-
-                            Rectangle {
-                                GlassSheen {}
-                                id: sbSmartBumpCard
-                                width: (parent.width - 6) / 2; height: 36; radius: 12
-                                clip: true
-                                readonly property bool isActive: root.dockEnabled
-                                    && ((!root.smartCardFlipped && root.dockMode === "smart") || (root.smartCardFlipped && root.dockMode === "bump"))
-                                color: isActive
-                                    ? Qt.rgba(1,1,1,0.15)
-                                    : (sbSmartBumpMouse.containsMouse ? Qt.rgba(1,1,1,0.10) : Qt.rgba(1,1,1,0.05))
-                                border.color: isActive ? Qt.rgba(1,1,1,0.40) : Qt.rgba(1,1,1,0.12)
-                                border.width: 1
-                                Behavior on color        { ColorAnimation { duration: 150 } }
-                                Behavior on border.color { ColorAnimation { duration: 150 } }
-
-                                transform: Rotation {
-                                    id: sbSmartFlipRotation
-                                    origin.x: sbSmartBumpCard.width / 2
-                                    origin.y: sbSmartBumpCard.height / 2
-                                    axis { x: 0; y: 1; z: 0 }
-                                    angle: root.smartCardFlipped ? 180 : 0
-                                    Behavior on angle {
-                                        NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
-                                    }
-                                }
-
-                                Item {
-                                    anchors.fill: parent
-                                    visible: sbSmartFlipRotation.angle < 90
-                                    Text {
-                                        renderType: Text.NativeRendering; anchors.centerIn: parent
-                                        text: "Smart"
-                                        color: (root.dockEnabled && root.dockMode === "smart") ? "white" : Qt.rgba(1,1,1,0.45)
-                                        font.pixelSize: 12; font.family: root.textFontFamily
-                                        font.weight: (root.dockEnabled && root.dockMode === "smart") ? Font.DemiBold : Font.Normal
-                                        Behavior on color { ColorAnimation { duration: 150 } }
-                                    }
-                                }
-
-                                Item {
-                                    anchors.fill: parent
-                                    visible: sbSmartFlipRotation.angle >= 90
-                                    transform: Rotation {
-                                        origin.x: sbSmartBumpCard.width / 2
-                                        origin.y: sbSmartBumpCard.height / 2
-                                        axis { x: 0; y: 1; z: 0 }
-                                        angle: 180
-                                    }
-                                    Text {
-                                        renderType: Text.NativeRendering; anchors.centerIn: parent
-                                        text: "Bump"
-                                        color: (root.dockEnabled && root.dockMode === "bump") ? "white" : Qt.rgba(1,1,1,0.45)
-                                        font.pixelSize: 12; font.family: root.textFontFamily
-                                        font.weight: (root.dockEnabled && root.dockMode === "bump") ? Font.DemiBold : Font.Normal
-                                        Behavior on color { ColorAnimation { duration: 150 } }
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: sbSmartBumpMouse; anchors.fill: parent
-                                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    onClicked: (mouse) => {
-                                        if (mouse.button === Qt.RightButton) {
-                                            root.smartCardFlipped = !root.smartCardFlipped
-                                        } else {
-                                            const targetMode = root.smartCardFlipped ? "bump" : "smart"
-                                            if (root.dockEnabled && root.dockMode === targetMode) {
-                                                root.dockEnabledToggleRequested()
-                                            } else {
-                                                root.dockModeChangeRequested(targetMode)
-                                                if (!root.dockEnabled) root.dockEnabledToggleRequested()
-                                            }
-                                        }
-                                    }
-                                }
+                            MouseArea {
+                                id: swatchArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.appearanceWalColorIndexRequested(swatchDelegate.index)
                             }
                         }
                     }
                 }
+
+                Item { width: 1; height: 10 }
+
+                ControlPillGroup {
+                    readonly property var levels: [0.20, 0.40, 0.60, 0.80, 1.0]
+                    model: ["20%", "40%", "60%", "80%", "100%"]
+                    currentIndex: {
+                        for (let i = 0; i < levels.length; i++) {
+                            if (Math.abs(root.capsuleOpacityValue - levels[i]) < 0.01) return i
+                        }
+                        return -1
+                    }
+                    pillHeight: 26; sidePadding: 7; fontSize: 11; spacing: 3
+                    textFontFamily: root.textFontFamily
+                    onActivated: function(index) { root.appearanceOpacityRequested(levels[index]) }
+                }
+            }
+
+            Rectangle {
+                x: appearancePage.sideMargin + appearancePage.columnWidth + appearancePage.columnGap / 2
+                y: 64; width: 1; height: 160
+                color: IslandMotion.hairlineColor
+            }
+
+            Column {
+                x: appearancePage.sideMargin + appearancePage.columnWidth + appearancePage.columnGap
+                y: 60
+                width: appearancePage.columnWidth
+
+                ControlSwitchRow {
+                    width: parent.width
+                    label: "Liquid Glass"
+                    on: Glass.enabled
+                    textFontFamily: root.textFontFamily
+                    onToggled: Glass.setEnabled(!Glass.enabled)
+                }
+
+                Item { width: 1; height: 14 }
+
+                Text {
+                    renderType: Text.NativeRendering
+                    text: "Dock"; color: IslandMotion.textSecondary
+                    font.pixelSize: 11; font.family: root.textFontFamily
+                    font.weight: Font.Medium
+                }
+                ControlSwitchRow {
+                    width: parent.width
+                    label: "Enable"
+                    on: root.dockEnabled
+                    textFontFamily: root.textFontFamily
+                    onToggled: root.dockEnabledToggleRequested()
+                }
+
+                Item {
+                    width: parent.width
+                    height: root.dockEnabled ? 38 : 0
+                    opacity: root.dockEnabled ? 1 : 0
+                    clip: true
+                    Behavior on height { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: 160 } }
+
+                    Row {
+                        y: 8
+                        spacing: 6
+
+                        ControlPill {
+                            width: (appearancePage.columnWidth - 6) / 2; height: 30
+                            label: "Pin"
+                            active: root.dockEnabled && root.dockMode === "pin"
+                            textFontFamily: root.textFontFamily
+                            onClicked: root.dockModeChangeRequested("pin")
+                        }
+                        ControlPill {
+                            width: (appearancePage.columnWidth - 6) / 2; height: 30
+                            label: (root.smartCardFlipped ? "Bump" : "Smart") + "  ⇄"
+                            active: root.dockEnabled
+                                    && ((!root.smartCardFlipped && root.dockMode === "smart")
+                                        || (root.smartCardFlipped && root.dockMode === "bump"))
+                            textFontFamily: root.textFontFamily
+                            onClicked: {
+                                const targetMode = root.smartCardFlipped ? "bump" : "smart"
+                                if (root.dockEnabled && root.dockMode === targetMode) {
+                                    root.dockEnabledToggleRequested()
+                                } else {
+                                    root.dockModeChangeRequested(targetMode)
+                                    if (!root.dockEnabled) root.dockEnabledToggleRequested()
+                                }
+                            }
+                            onRightClicked: root.smartCardFlipped = !root.smartCardFlipped
+                        }
+                    }
                 }
             }
         }
@@ -1102,7 +890,7 @@ PanelWindow {
                 Text {
                     renderType: Text.NativeRendering
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.wifiGlyph; font.family: root.iconFontFamily; font.pixelSize: 16
+                    text: root.wifiGlyph.length > 0 ? root.wifiGlyph : "\uf1eb"; font.family: root.iconFontFamily; font.pixelSize: 16
                     color: root.wifiEnabled ? StyleTokens.accent : IslandMotion.textFaint
                 }
                 Text {
@@ -1250,7 +1038,7 @@ PanelWindow {
                 Text {
                     renderType: Text.NativeRendering
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.bluetoothGlyph; font.family: root.iconFontFamily; font.pixelSize: 16
+                    text: root.bluetoothGlyph.length > 0 ? root.bluetoothGlyph : "\uf294"; font.family: root.iconFontFamily; font.pixelSize: 16
                     color: root.bluetoothEnabled ? StyleTokens.accent : IslandMotion.textFaint
                 }
                 Text {

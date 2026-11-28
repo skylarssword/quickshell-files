@@ -39,6 +39,8 @@ QtObject {
     readonly property color textPrimary:   Qt.rgba(0.98, 0.98, 1.00, 0.98)
     readonly property color textSecondary: Qt.rgba(0.90, 0.90, 0.95, 0.94)
     readonly property color textFaint:     Qt.rgba(0.82, 0.82, 0.90, 0.88)
+    readonly property color onLightInk:    Qt.rgba(0.10, 0.12, 0.15, 1.00)
+    readonly property color hairlineColor: Qt.rgba(1.00, 1.00, 1.00, 0.09)
 
     // ---- surface border (thin hairline) -------------------
     readonly property color surfaceBorderColor: Qt.rgba(0.35, 0.35, 0.40, 0.40)
